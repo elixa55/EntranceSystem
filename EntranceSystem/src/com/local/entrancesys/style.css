@@ -31,12 +31,15 @@
 }
 
 
-
 #context {
     -fx-background-color: #b19cd9;
     -fx-text-fill: white;
     -fx-font-weight: bold;
     -fx-font-size: 13;
+}
+
+#imageContainer {
+     -fx-background-color: #b19cd9;
 }
 
 .button{

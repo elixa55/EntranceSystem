@@ -24,12 +24,12 @@
    <children>
       <BorderPane layoutX="109.0" layoutY="103.0" prefHeight="300.0" prefWidth="400.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
          <center>
-            <TableView fx:id="table" maxWidth="-Infinity" prefHeight="323.0" prefWidth="484.0" BorderPane.alignment="CENTER_LEFT">
+            <TableView fx:id="table" maxWidth="-Infinity" prefHeight="323.0" prefWidth="589.0" BorderPane.alignment="CENTER_LEFT">
               <columns>
-                <TableColumn id="col" fx:id="tId" maxWidth="20.0" prefWidth="20.0" text="Id" />
+                <TableColumn id="col" fx:id="tId" maxWidth="25.0" prefWidth="25.0" text="Id" />
                 <TableColumn id="col" fx:id="tName" maxWidth="150.0" prefWidth="150.0" text="Name" />
-                  <TableColumn id="col" fx:id="tPassword" maxWidth="150.0" prefWidth="150.0" text="Jelszó" />
-                  <TableColumn id="col" fx:id="tFinger" maxWidth="150.0" prefWidth="150.0" text="Minutiae array" />
+                  <TableColumn id="col" fx:id="tPassword" maxWidth="150.0" prefWidth="150.0" text="Password" />
+                  <TableColumn id="col" fx:id="tFinger" maxWidth="220.07546720032917" prefWidth="217.35845947265625" text="Minutiae array" />
               </columns>
                <contextMenu>
                   <ContextMenu id="context">
@@ -48,24 +48,29 @@
                      <content>
                         <AnchorPane id="edit" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                            <children>
-                              <Button layoutX="320.0" layoutY="145.0" mnemonicParsing="false" onAction="#buttonEnroll" prefHeight="27.0" prefWidth="100.0" text="Enroll" />
-                              <ComboBox fx:id="addBaudRate" layoutX="271.0" layoutY="33.0" prefWidth="150.0" />
-                              <ComboBox fx:id="addPort" layoutX="271.0" layoutY="75.0" prefWidth="150.0" />
-                              <Label layoutX="177.0" layoutY="37.0" prefHeight="18.0" prefWidth="78.0" text="Baudrate" />
-                              <Label layoutX="177.0" layoutY="79.0" text="Serial port" />
-                              <Button layoutX="615.0" layoutY="145.0" mnemonicParsing="false" onAction="#buttonSave" prefHeight="27.0" prefWidth="100.0" text="Save" />
-                              <Label layoutX="473.0" layoutY="37.0" text="File name" />
-                              <TextField fx:id="addFileName" layoutX="567.0" layoutY="33.0" prefHeight="26.0" prefWidth="200.0" />
+                              <Button layoutX="164.0" layoutY="145.0" mnemonicParsing="false" onAction="#buttonEnroll" prefHeight="27.0" prefWidth="100.0" text="Enroll" />
+                              <ComboBox fx:id="addBaudRate" layoutX="115.0" layoutY="33.0" prefWidth="150.0" />
+                              <ComboBox fx:id="addPort" layoutX="115.0" layoutY="75.0" prefWidth="150.0" />
+                              <Label layoutX="21.0" layoutY="37.0" prefHeight="18.0" prefWidth="78.0" text="Baudrate" />
+                              <Label layoutX="21.0" layoutY="79.0" text="Serial port" />
+                              <Button layoutX="764.0" layoutY="145.0" mnemonicParsing="false" onAction="#buttonSave" prefHeight="27.0" prefWidth="100.0" text="Save" />
+                              <Label layoutX="548.0" layoutY="37.0" text="File name" />
+                              <TextField fx:id="addFileName" layoutX="642.0" layoutY="33.0" prefHeight="26.0" prefWidth="225.0" promptText="Name without extension" />
+                              <TextArea fx:id="text" layoutX="289.0" layoutY="27.0" prefHeight="139.0" prefWidth="247.0" promptText="Message from sensor">
+                                 <font>
+                                    <Font size="12.0" />
+                                 </font>
+                              </TextArea>
                            </children>
                         </AnchorPane>
                      </content>
                   </Tab>
-                  <Tab id="enroll" fx:id="match" text="Match                         ">
+                  <Tab id="enroll" fx:id="match" text="Match - Identify            ">
                      <content>
                         <AnchorPane id="edit" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                            <children>
-                              <Button layoutX="762.0" layoutY="153.0" mnemonicParsing="false" onAction="#identifyButton" prefHeight="27.0" prefWidth="100.0" text="Identify" />
-                           	  <Button layoutX="579.0" layoutY="153.0" mnemonicParsing="false" onAction="#matchButton" prefHeight="27.0" prefWidth="100.0" text="Match" />
+                              <Button layoutX="762.0" layoutY="153.0" mnemonicParsing="false" onAction="#buttonIdentify" prefHeight="27.0" prefWidth="100.0" text="Identify" />
+                           	  <Button layoutX="579.0" layoutY="153.0" mnemonicParsing="false" onAction="#buttonMatch" prefHeight="27.0" prefWidth="100.0" text="Match" />
                               <TextArea id="textBox" fx:id="textBox" layoutX="80.0" layoutY="22.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="175.0" prefWidth="422.0" promptText="Result of matching" wrapText="true">
                                  <font>
                                     <Font size="11.0" />
@@ -74,12 +79,12 @@
                         </AnchorPane>
                      </content>
                   </Tab>
-                <Tab id="add" fx:id="add" style="-fx-color: white;" text="Add new employee     ">
+                <Tab id="add" fx:id="add" text="Add new employee     ">
                   <content>
                     <AnchorPane id="add" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                            <children>
                               <TextField id="addName" fx:id="addName" layoutX="204.0" layoutY="43.0" maxHeight="-Infinity" maxWidth="-Infinity" prefHeight="25.0" prefWidth="256.0" promptText="Name" />
-                              <Button layoutX="629.0" layoutY="153.0" mnemonicParsing="false" onAction="#addButton" prefHeight="27.0" prefWidth="100.0" text="Add" />
+                              <Button layoutX="629.0" layoutY="153.0" mnemonicParsing="false" onAction="#buttonAdd" prefHeight="27.0" prefWidth="100.0" text="Add" />
                               <TextField id="addPassword" fx:id="addPassword" layoutX="204.0" layoutY="99.0" prefHeight="25.0" prefWidth="256.0" promptText="Password" />
                            </children>
                         </AnchorPane>
@@ -90,7 +95,7 @@
                         <AnchorPane id="edit" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                            <children>
                               <TextField id="editName" fx:id="editName" layoutX="14.0" layoutY="14.0" prefHeight="25.0" prefWidth="256.0" promptText="Name" />
-                              <Button layoutX="763.0" layoutY="161.0" mnemonicParsing="false" onAction="#editButton" prefHeight="27.0" prefWidth="100.0" text="Edit" />
+                              <Button layoutX="763.0" layoutY="161.0" mnemonicParsing="false" onAction="#buttonEdit" prefHeight="27.0" prefWidth="100.0" text="Edit" />
                               <TextArea id="editFinger" fx:id="editFinger" editable="false" layoutX="322.0" layoutY="14.0" prefHeight="122.0" prefWidth="441.0" promptText="Minutiae array" wrapText="true">
                                  <font>
                                     <Font size="11.0" />
@@ -121,20 +126,20 @@
             </MenuBar>
          </top>
          <right>
-            <Pane id="imagePane" fx:id="imagePane" prefHeight="323.0" prefWidth="416.0" BorderPane.alignment="CENTER">
+            <Pane id="imagePane" fx:id="imagePane" prefHeight="323.0" prefWidth="353.0" BorderPane.alignment="CENTER">
                <children>
-                  <Pane prefHeight="45.0" prefWidth="418.0" style="-fx-background-color: #eeeeee;">
+                  <Pane prefHeight="45.0" prefWidth="351.0" style="-fx-background-color: #eeeeee;">
                      <children>
-                        <Label layoutX="128.0" layoutY="1.0" lineSpacing="2.0" prefHeight="43.0" prefWidth="191.0" style="-fx-text-fill: black;" text="Enrolled fingerprint" textOverrun="CLIP" wrapText="true">
+                        <Label layoutX="94.0" layoutY="1.0" lineSpacing="2.0" prefHeight="43.0" prefWidth="191.0" style="-fx-text-fill: black;" text="Enrolled fingerprint" textOverrun="CLIP" wrapText="true">
                            <font>
                               <Font name="System Bold" size="18.0" />
                            </font>
                         </Label>
                      </children>
                   </Pane>
-                  <Pane fx:id="imageContainer" layoutX="1.0" layoutY="44.0" prefHeight="281.0" prefWidth="417.0">
+                  <Pane fx:id="imageContainer" layoutX="1.0" layoutY="44.0" prefHeight="281.0" prefWidth="351.0">
                      <children>
-                        <ImageView id="probeImage" fx:id="probeImage" fitHeight="215.0" fitWidth="198.0" layoutX="114.0" layoutY="33.0" nodeOrientation="INHERIT" pickOnBounds="true" smooth="false">
+                        <ImageView id="probeImage" fx:id="probeImage" fitHeight="215.0" fitWidth="198.0" layoutX="81.0" layoutY="33.0" nodeOrientation="INHERIT" pickOnBounds="true" smooth="false">
                            <effect>
                               <InnerShadow />
                            </effect>

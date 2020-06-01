@@ -48,9 +48,13 @@ import java.nio.file.StandardCopyOption;
 import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Pattern;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.ButtonType;
+import javafx.scene.control.TabPane;
 import jssc.SerialPort;
+import jssc.SerialPortEvent;
+import jssc.SerialPortEventListener;
 
 public class ViewController implements Initializable {
       // FXML elements
@@ -86,22 +90,29 @@ public class ViewController implements Initializable {
       private ComboBox addPort;
       @FXML
       private TextField addFileName;
+      @FXML
+      private TabPane tabPane;
+      @FXML
+      private TextArea text;
+      
       // global variables
       private String selectedId;
-      private PersonDao database = new PersonDaoImpl();
-      private ObservableList<Person> tableData = database.get();
-      public static String actualFinger = null;
-      public static String folderPath = "C:\\Users\\kisgép1\\Documents\\NetBeansProjects\\EntranceSys\\";
-      public static String usedBaud;
-      public static String usedPort;
-      public static String usedFileName;
-      public static BufferedImage imageToSave;
+      final private static PersonDao database = new PersonDaoImpl();
+      public static ObservableList<Person> personData = database.get();
+      private static String actualFinger = null;
+      final private static String folderPath = System.getProperty("user.home") + "\\Documents\\NetBeansProjects\\EntranceSys\\";
+      private static String usedBaud;
+      private static String usedPort;
+      private static String usedFileName;
+      private static BufferedImage imageToSave;
 
-      public static int width = 256;
-      public static int height = 288;
-      public static int depth = 8;
-      public static byte[] array;
+      final private static int width = 256;
+      final private static int height = 288;
+      final private static int depth = 8;
+      private static byte[] array;
       public static Login staticLog;
+      public static boolean flag = false;
+      public static boolean dataAvailable = false;
       // actually enrolled image loading to ByteArray typed 'array' variable
       public void createImageByteArray(BufferedImage image, String name) {
             Image im;
@@ -188,25 +199,37 @@ public class ViewController implements Initializable {
                               fileOut.writeByte(i);
                         }
                   }
-                  int actualByte = 0;
-                  for (int i = 0, j = 0; i < width * height; i += 2, j++) {
-                        fileOut.writeByte((byte) array[j] & (byte) 0xf0);
-                        fileOut.writeByte((byte) (array[j] & (byte) 0x0f) << 4);
+                  // gray rectangle
+                  if (array == null) {
+			for (int i=0;i<width*height;i++) {
+                           if (i%2==0)
+                                 fileOut.writeByte((byte)0x00);
+                           else
+                                 fileOut.writeByte((byte)0xff);
+			}
                   }
-//			int actualLength = array.length;
-//			for (int i=actualLength;i<width*height;i++) {
-//				fileOut.writeByte((byte)0x00);
-//			}
+                  else {
+                        // for 1 version
+                        for (int i = 0, j = 0; i < width * height; i += 2, j++) {
+                              fileOut.writeByte((byte) array[j] & (byte) 0xf0);
+                              fileOut.writeByte((byte) (array[j] & (byte) 0x0f) << 4);
+                        }
+                        // for 2 version
+//                      for (int i = 1, j = 0; i < width * height+1; i += 2, j++) {
+//                            fileOut.writeByte((byte) array[j] & (byte) 0xf0);
+//                            fileOut.writeByte((byte) (array[j] & (byte) 0x0f) << 4);
+//                      }
+                  }
                   fileOut.close();
-
             } catch (IOException e) {
                   e.printStackTrace();
             }
       }
-      // read data from sensor to 'array' variables
-      public void enrollImage() throws SerialPortException, InterruptedException {
+      
+      // read data from sensor to 'array' variables - 1 version
+      public void readDataFromSensor1() throws SerialPortException, InterruptedException {
+            String s = "";
             StringBuilder sb = new StringBuilder();
-            boolean result = false;
             SerialPort myport = new SerialPort(usedPort);
             myport.openPort();
             myport.setParams(SerialPort.BAUDRATE_57600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1,
@@ -215,12 +238,13 @@ public class ViewController implements Initializable {
                   System.out.println("A portot megnyitottam.");
             }
             Thread.sleep(3000);
-            System.out.println("Put your finger on the sensor fast!!!");
+            message("Put your finger on sensor\nthen wait a while!");
             while (myport.isOpened()) {
                   String curr = myport.readString();
                   if (curr != null) {
                         sb.append(curr);
                         System.out.print(curr + "\n");
+                        s += curr;
                         if (curr.contains("e.") || curr.contains("\n.")) {
                               break;
                         }
@@ -230,13 +254,75 @@ public class ViewController implements Initializable {
             if (!myport.isOpened()) {
                   System.out.println("A portot becsuktam.");
             }
+            text.setText(s);
             array = sb.toString().getBytes();
             System.out.println("tomb hossz: " + array.length);
+      }
+      
+     // Eventlistener - it is not used
+      private static class PortReader implements SerialPortEventListener {
+      SerialPort myport;
+      PortReader(SerialPort myport) {
+            this.myport = myport;
+      }
+      @Override
+      public void serialEvent(SerialPortEvent event) {
+            if(event.isRXCHAR() && event.getEventValue() > 0) {
+                  dataAvailable = true;
+                  int bytesCount = event.getEventValue();
+                  try {
+                        System.out.print(myport.readString(bytesCount));
+                  } catch (SerialPortException ex) {
+                        System.out.println("Serial communication error");
+                  }
+            }
+            else 
+                  dataAvailable = false;
+            }
+      }
+      
+      // read data from sensor to 'array' variables - 2 version
+      public void readDataFromSensor2() throws SerialPortException, InterruptedException {
+            String s = "";
+            StringBuilder sb = new StringBuilder();
+            SerialPort myport = new SerialPort(usedPort);
+            myport.openPort();
+            myport.setParams(SerialPort.BAUDRATE_57600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1,
+                    SerialPort.PARITY_NONE);
+            //myport.addEventListener(new PortReader());
+            if (myport.isOpened()) {
+                  System.out.println("A portot megnyitottam.");
+            }
+            Thread.sleep(3000);
+            System.out.println("Put your finger on the sensor fast!!!");
+            while (myport.isOpened()) {
+                  String curr = myport.readString();
+                  do {
+                        System.out.print(curr + "\n");
+                        s += curr;
+                  }  while (curr.equals(Character.toString('\t')));
+                  System.out.println("Put your finger on sensor screen");
+                  s += "\nPut your finger on sensor screen\nand wait a while...";
+                  text.setText(s);
+                  message(s);
+                  array = myport.readBytes(36865); // 36864 Byte
+//                  while (spazio)
+//                        myport.readString();
+                  myport.closePort();
+            }
+            if (!myport.isOpened()) {
+                  System.out.println("A portot becsuktam.");
+            }
+            System.out.println("tomb hossz: " + array.length);
+            text.clear();
+            probeImage.setImage(null);
       }
          
       // Enroll button -> opens given port, get the fingerprint, displays enrolled image
       @FXML
       public void buttonEnroll(ActionEvent event) throws SerialPortException, InterruptedException, IOException {
+            probeImage.setImage(null);
+            text.clear();
             usedBaud = addBaudRate.getSelectionModel().getSelectedItem().toString();
             usedPort = addPort.getSelectionModel().getSelectedItem().toString();
             imageToSave = new BufferedImage(width, height, BufferedImage.TYPE_3BYTE_BGR);
@@ -245,7 +331,7 @@ public class ViewController implements Initializable {
             File fileTemp = new File(folderPath + actualFinger);
             if (fileTemp.exists())
                   fileTemp.delete();
-            enrollImage();
+            readDataFromSensor1();
             createImageByteArray(im, actualFinger);
             FileInputStream inputstream; 
             try {
@@ -262,16 +348,37 @@ public class ViewController implements Initializable {
             String subFolder = "src\\fingerprints\\";
             Path fileTemp = Paths.get(folderPath + actualFinger);
             if (confirmation()) {
-            if ((addFileName.getText() == null || addFileName.getText().equals(""))) {
-                 message("You must enroll the fingerprint or missing file name error.");
-            } else {
-                  Path fileToSave = Paths.get(folderPath + subFolder + addFileName.getText());
-                  Files.copy(fileTemp, fileToSave, StandardCopyOption.REPLACE_EXISTING);
-                  System.out.println("Szoveg: " + addFileName.getText() + "vege");
-                  message("Image is saved");
-                  addFileName.clear();
+                  if ((addFileName.getText() == null || addFileName.getText().equals(""))) {
+                       message("You should name your file");
+                  }
+                  else {
+                       if (probeImage.getImage() != null) {
+                             String validFileName = fileNameCheck(addFileName.getText());
+                             if (validFileName != null) {
+                                    Path fileToSave = Paths.get(folderPath + subFolder + validFileName);
+                                    Files.copy(fileTemp, fileToSave, StandardCopyOption.REPLACE_EXISTING);
+                                    message("Image is saved");
+                                    addFileName.clear();
+                             }
+                             else
+                                   message("Incorrect filename");
+                        }
+                        else                               
+                              message("First enroll fingerprint");
                   }
             } 
+      }
+      
+      public static String fileNameCheck(String name) {
+            String regex = "^[a-zA-Z_]+[a-zA-Z0-9_\\.]*";
+            Pattern pattern = Pattern.compile(regex);
+            if (pattern.matcher(name).matches()) {
+                  int index = name.lastIndexOf(".");
+                  String validFileName = name.substring(0, index);
+                  validFileName += ".bmp";
+                  return validFileName;
+            }
+           return null;
       }
       // editable fields get clicked row's values
       @FXML
@@ -290,7 +397,7 @@ public class ViewController implements Initializable {
       }
       // adding new record to database (name, password of new employee) - finger field is not editable
       @FXML
-      public void addButton(ActionEvent event) {
+      public void buttonAdd(ActionEvent event) {
             Person p = new Person();
             p.setName(addName.getText());
             p.setFinger("");
@@ -300,7 +407,7 @@ public class ViewController implements Initializable {
       }
       // modify the selected fields' values
       @FXML
-      public void editButton(ActionEvent event) {
+      public void buttonEdit(ActionEvent event) {
             Person p = new Person();
             p.setId(selectedId);
             p.setName(editName.getText());
@@ -354,6 +461,7 @@ public class ViewController implements Initializable {
             staticLog.showAndWait();
             if (buttonLoginClicked) {
                   staticLog.close();
+                  tabPane.getSelectionModel().select(1);
             }
       }
       // 1, File menu -> 2th submenu -> exit from app
@@ -389,16 +497,16 @@ public class ViewController implements Initializable {
             tName.setCellValueFactory(cellData -> cellData.getValue().nameProperty());
             tPassword.setCellValueFactory(cellData -> cellData.getValue().passwordProperty());
             tFinger.setCellValueFactory(cellData -> cellData.getValue().fingerProperty());
-            table.setItems(tableData);
+            table.setItems(personData);
       }
       // actualize the content of tableview
       private void refresh() {
-            tableData = database.get();
-            table.setItems(tableData);
+            personData = database.get();
+            table.setItems(personData);
       }
       // matching the enrolled element to all elements of database
       @FXML
-      public void matchButton(ActionEvent event) {
+      public void buttonMatch(ActionEvent event) {
             String text = "";
             try {
                   List<String> names = new ArrayList<String>();
@@ -406,7 +514,7 @@ public class ViewController implements Initializable {
                   if (actualFinger != null) {
                         byte[] candidateImageToByte = Files.readAllBytes(Paths.get(actualFinger));
                         FingerprintTemplate candidateImageToTemplate = new FingerprintTemplate().create(candidateImageToByte);
-                        for (Person p : tableData) {
+                        for (Person p : personData) {
                               FingerprintTemplate deserialized = new FingerprintTemplate().deserialize(p.getFinger());
                               double score = new FingerprintMatcher() // matching factor - higher -> better
                                       .index(deserialized).match(candidateImageToTemplate);
@@ -427,7 +535,7 @@ public class ViewController implements Initializable {
                         System.out.println(text);
                         textBox.setText(text);
                   } else {
-                        message("Choose a valid finger image from File menu!");
+                        message("First enroll fingerprint");
                   }
             } catch (Exception e) {
                   System.out.println(e.getMessage() + e);
@@ -436,11 +544,11 @@ public class ViewController implements Initializable {
       }
       // mathching the actual user to all elements of database
       @FXML
-      public void identifyButton(ActionEvent event) {
+      public void buttonIdentify(ActionEvent event) {
             String text = "";
             Person person = null;
             try {
-                  for (Person p : tableData) {
+                  for (Person p : personData) {
                         if (p.getName().equals(userName)) {
                               person = p;
                         }
@@ -465,7 +573,8 @@ public class ViewController implements Initializable {
                               System.out.println(text);
                               textBox.setText(text);
                         } else {
-                              message("Choose a valid finger image from File menu!");
+                              message("First enroll fingerprint");
+                              tabPane.getSelectionModel().select(0);
                         }
                   }
             } catch (Exception e) {
@@ -479,7 +588,8 @@ public class ViewController implements Initializable {
       // confirmation
       public boolean confirmation() {
             Alert alert = new Alert(AlertType.CONFIRMATION);
-            alert.setTitle("Do you really want to preserve image?");
+            alert.setTitle("CONFIRMATION");
+            alert.setHeaderText("Do you really want to preserve image?");
             Optional<ButtonType> reply = alert.showAndWait();
             if (reply.get() == ButtonType.OK) {
                   return true;
@@ -519,12 +629,11 @@ public class ViewController implements Initializable {
       // overriding initialize method - in each init
       @Override
       public void initialize(URL url, ResourceBundle rb) {
-            PersonDaoImpl databaseFingerprints = new PersonDaoImpl();
-            databaseFingerprints.createTable();
+            database.createTable();
             setTableData();
             getValueViaClick();
             options();
-            addBaudRate.getSelectionModel().select(0);
-            addPort.getSelectionModel().select(2);
+            addBaudRate.getSelectionModel().select(3);
+            addPort.getSelectionModel().select(7);
       }
 }
