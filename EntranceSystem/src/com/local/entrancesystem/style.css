@@ -1,0 +1,67 @@
+/* JavaFX CSS - Leave this comment until you have at least create one rule which uses -fx-Property */
+.root {
+    -fx-base: lightblue;
+    -fx-background-color: #ccccff 5%;
+    -fx-control-inner-background: lightgray;
+}
+
+#col {
+    -fx-background-color: whitesmoke;
+    -fx-font-weight: bold;
+    -fx-text-fill: black;
+    -fx-font-style: oblique;
+    -fx-font-size: 15;
+    -fx-font-family: "Consolas";
+}
+
+#col:hover {
+    -fx-background-color: gray;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-style: oblique;
+    -fx-font-size: 15;
+    -fx-font-family: "Consolas";
+}
+
+#enroll, #match, #add, #edit {
+    -fx-font-size: 16;
+    -fx-font-family: "Courier";
+    -fx-font-style: oblique;
+    -fx-font-weight: bold;
+}
+
+
+#context {
+    -fx-background-color: #b19cd9;
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-font-size: 13;
+}
+
+#imagePane {
+     -fx-background-color: #b19cd9;
+}
+
+.button{
+    -fx-text-fill:white;
+    -fx-font-size: 14px;
+    -fx-background-color: linear-gradient(#555555 0%, #000000 50%, #aaaaaa 100%);
+    -fx-padding: 3 20 3 20;
+    -fx-border-radius: 30px;
+    -fx-border-width: 4px;
+    -fx-border-color: black;
+}
+
+.tab:selected {
+    -fx-background-color: #b19cd9;
+}
+.tab:hover {              
+    -fx-border-width: 4px;
+    -fx-background-color: slategray; 
+}
+
+#tabPane{-fx-padding: 1; 
+         -fx-background-image: url('/templates/image2.jpg');
+         -fx-control-inner-background: lightgray;
+         -fx-background-insets: 0, 1;}
+

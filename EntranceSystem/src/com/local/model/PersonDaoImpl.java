@@ -13,6 +13,9 @@ import javafx.collections.ObservableList;
 
 public class PersonDaoImpl implements PersonDao {
 
+    /**
+     * 
+     */
     Connection conn = null;
     Statement createStatement = null;
     DatabaseMetaData dbmd = null;
@@ -38,20 +41,26 @@ public class PersonDaoImpl implements PersonDao {
         try {
             ResultSet rs = dbmd.getTables(null, null, "%", null);
             if (!rs.next()) {
-                createStatement.execute("CREATE TABLE IF NOT EXISTS persons ( `id` INT NOT NULL AUTO_INCREMENT , `name` VARCHAR(20) NOT NULL , `finger` VARCHAR(1500) NOT NULL, `password` VARCHAR(10) NOT NULL, PRIMARY KEY (`id`)) ENGINE = InnoDB;");
+                createStatement.execute("CREATE TABLE IF NOT EXISTS persons ( `id` INT NOT NULL AUTO_INCREMENT , `firstname` VARCHAR(20) NOT NULL , `lastname` VARCHAR(20) NOT NULL ,`finger` VARCHAR(6000) NOT NULL, `occupation` VARCHAR(20) NOT NULL , `password` VARCHAR(10) NOT NULL, PRIMARY KEY (`id`)) ENGINE = InnoDB;");
             }
         } catch (SQLException e) {
            e.getMessage();
         }
     }
 
+    /** create a new record
+     * @param rs
+     * @return
+     */
     private Person createPerson(ResultSet rs) {
         Person p = null;
         try {
             p = new Person();
             p.setId(rs.getString("id"));
-            p.setName(rs.getString("name"));
+            p.setFirstname(rs.getString("firstname"));
+            p.setLastname(rs.getString("lastname"));
             p.setFinger(rs.getString("finger"));
+            p.setOccupation(rs.getString("occupation"));
             p.setPassword(rs.getString("password"));
         } catch (SQLException e) {
             e.getMessage();
@@ -82,14 +91,16 @@ public class PersonDaoImpl implements PersonDao {
 
     @Override
     public void add(Person p) {
-        String sql = "INSERT INTO persons (name, finger, password) VALUES (?,?,?)";
+        String sql = "INSERT INTO persons (firstname, lastname, finger, occupation, password) VALUES (?,?,?,?,?)";
         try {
             Class.forName(JDBC_DRIVER);
             conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
             PreparedStatement preparedStatement = conn.prepareStatement(sql);
-            preparedStatement.setString(1, p.getName());
-            preparedStatement.setString(2, p.getFinger());
-            preparedStatement.setString(3,  p.getPassword());
+            preparedStatement.setString(1, p.getFirstname());
+            preparedStatement.setString(2, p.getLastname());
+            preparedStatement.setString(3, p.getFinger());
+            preparedStatement.setString(4, p.getOccupation());
+            preparedStatement.setString(5,  p.getPassword());
             preparedStatement.execute();
             conn.close();
         } catch (ClassNotFoundException | SQLException e) {
@@ -114,15 +125,17 @@ public class PersonDaoImpl implements PersonDao {
 
     @Override
     public void update(Person p) {
-        String sql = "UPDATE persons SET name = ?, finger = ?, password = ? WHERE id = ?";
+        String sql = "UPDATE persons SET firstname = ?, lastname = ?, finger = ?, occupation = ?, password = ? WHERE id = ?";
         try {
             Class.forName(JDBC_DRIVER);
             conn = DriverManager.getConnection(URL, USERNAME, PASSWORD);
             PreparedStatement preparedStatement = conn.prepareStatement(sql);
-            preparedStatement.setString(1, p.getName());
-            preparedStatement.setString(2, p.getFinger());
-            preparedStatement.setString(3, p.getPassword());
-            preparedStatement.setString(4, p.getId());
+            preparedStatement.setString(1, p.getFirstname());
+            preparedStatement.setString(2, p.getLastname());
+            preparedStatement.setString(3, p.getFinger());
+            preparedStatement.setString(4, p.getOccupation());
+            preparedStatement.setString(5, p.getPassword());
+            preparedStatement.setString(6, p.getId());
             preparedStatement.execute();
             conn.close();
         } catch (ClassNotFoundException | SQLException e) {

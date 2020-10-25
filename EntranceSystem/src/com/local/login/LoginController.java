@@ -9,7 +9,7 @@ import javafx.event.ActionEvent;
 import javafx.fxml.FXML;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
-import static controller.ViewController.staticLog;
+import static controller.ViewController.staticLogin;
 import static controller.ViewController.personData;
 import model.Person;
 
@@ -17,7 +17,8 @@ import model.Person;
 public class LoginController implements Initializable {
 
   public static boolean buttonLoginClicked = false;
-  public static String userName;
+  public static Person logged;
+  public static String loggedName;
   public static String password;
     
     @FXML
@@ -29,26 +30,32 @@ public class LoginController implements Initializable {
     @FXML
     private Button addLogin;
 
+    /**log in editor application
+     * @param event
+     */
     @FXML
     void addLoginButton(ActionEvent event) {
         Person selected = null;
-        userName = addLoginName.getText();
+        loggedName = addLoginName.getText();
         password = addLoginPassword.getText();
-        if (userName.equals("") || userName == null || password.equals("") || password == null)
+        if (loggedName.equals("") || loggedName == null || password.equals("") || password == null)
               message("You should fill in all fields");
         else {
             for (Person p : personData) {
-              if (p.getName().equals(userName) && p.getPassword().equals(password))
+              if (p.getLastname().equals(loggedName) && p.getPassword().equals(password))
                        selected = p;     
             }
             if (selected != null){
-                  message("You can start the identification");
+                  message("Welcome to personal data editor");
                   buttonLoginClicked = true;
-                  staticLog.close();
+                  logged = selected;
+                  staticLogin.close();
                                     
             }
-            else
+            else {
                   message("Incorrect name or password");
+                  staticLogin.close();
+            }
         }
      }
     
