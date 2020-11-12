@@ -28,13 +28,14 @@ import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.CLAHE;
 import org.opencv.imgproc.Imgproc;
 
 import processing.BlockOrientation;
 import static processing.BlockOrientation.arrayToMat;
 
 public class ImageProcessing {
-	
+
 	static {
 		System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
 	}
@@ -50,13 +51,13 @@ public class ImageProcessing {
 
 	// for calculate orientation
 	private int gradientSigma = 1;
-	private int blockSigma = 7; 
-	private int orientSmoothSigma = 7;
-	private int fBlockSize = 38;
-	private int fWindowSize = 5;
-	private int fMinWaveLength = 3;
-	private int fMaxWaveLength = 15; 
-	private double filterSize = 0.65;
+	private int blockSigma = 5;
+	private int orientSmoothSigma = 5;
+	private int frequencyBlockSize = 38;
+	private int frequencyWindowSize = 5;
+	private int minWaveLength = 3;
+	private int maxWaveLength = 15;
+	private double filterSize = 0.55;
 
 	private Mat source = new Mat(size, matrixType);
 	private Mat equalizedRidge;
@@ -65,14 +66,17 @@ public class ImageProcessing {
 	private Mat orientation;
 	private Mat segmentedRidge;
 	private Mat filteredRidgeShow;
-	private Mat openedRidge;
+	private Mat thinnedRidge;
+	private Mat thinnedValley;
+	private Mat openedValley;
 	private Mat binarizedRidge;
 	private Mat withAnglesRidge;
 	private Mat minutiaeExtractedRidge;
 	private List<Minutiae> finalMinutiaeSet;
-	
-	/** constructor
-	 * executes the steps of image processing
+
+	/**
+	 * constructor executes the steps of image processing
+	 * 
 	 * @param input
 	 * @throws Exception
 	 */
@@ -82,10 +86,12 @@ public class ImageProcessing {
 		/***********
 		 * 1. step: histogram equalization: source -> equalized
 		 ************/
-		//resizeAndShow(source, "0 - Ridge Original");
+		// resizeAndShow(source, "0 - Ridge Original");
 		Imgproc.cvtColor(this.source, this.source, Imgproc.COLOR_RGB2GRAY);
-		this.equalizedRidge = equalizeOpenCV(source);
-		//resizeAndShow(equalizedRidge, "1 - Equalized ridge");
+		
+		//this.equalizedRidge = equalizeOpenCV(this.source);
+		this.equalizedRidge = equalizeAdaptiveOpenCV(this.source);
+		// resizeAndShow(equalizedRidge, "1 - Equalized ridge");
 
 		/***********
 		 * 2. step: normalize: equalized -> normalized normalized matrix values are
@@ -93,21 +99,20 @@ public class ImageProcessing {
 		 ************/
 		Mat floatedRidge = new Mat(size, CvType.CV_32FC1);
 		this.equalizedRidge.convertTo(floatedRidge, CvType.CV_32FC1);
-		Imgcodecs.imwrite("equ.bmp", this.equalizedRidge);
+
 		Mat normalizedRidge = new Mat(size, CvType.CV_32FC1);
 		normalizeImage(floatedRidge, normalizedRidge);
 //		this.normalizedRidgeShow = new Mat(size, CvType.CV_32SC1);
 //		Core.normalize(normalizedRidge, this.normalizedRidgeShow, 0, 255, Core.NORM_MINMAX, CvType.CV_8UC1);
-		//resizeAndShow(normalizedRidgeShow, "2 - Normalized Ridge");
+		// resizeAndShow(normalizedRidgeShow, "2 - Normalized Ridge");
 		this.normalizedRidgeShow = normalize(this.equalizedRidge);
-		//resizeAndShow(normalizedRidgeShow, "normalizált");
+		// resizeAndShow(normalizedRidgeShow, "normalizált");
 		/***********
 		 * 3. step: create instance of BlockOrientation for calculate of local data of
 		 * each block: variance, mean, coherence, orientation angle
 		 ************/
 		BlockOrientation orientationRidge = new BlockOrientation(this.normalizedRidgeShow, true);
-		
-		
+
 		/***********
 		 * 4. step: ROI declaration -> segmentation: normalizedRidgeShow -> segmented +
 		 * mask segmentation in base of histogram, if in local area normalized histogram
@@ -119,20 +124,21 @@ public class ImageProcessing {
 		Core.normalize(this.segmentedRidge, this.segmentedRidge, 0, 255, Core.NORM_MINMAX, CvType.CV_8UC1);
 		Imgproc.cvtColor(this.segmentedRidge, this.segmentedRidge, Imgproc.COLOR_GRAY2RGB);
 		// segmentedRidge = orientationRidge.drawGrid(segmentedRidge);
-		//resizeAndShow(segmentedRidge, "4 - Segmented Ridge");
+		// resizeAndShow(segmentedRidge, "4 - Segmented Ridge");
 		Mat maskRidgeInitial = orientationRidge.mask(this.segmentedRidge);
-		//resizeAndShow(maskRidgeInitial, "4 - Initial mask");
+		// resizeAndShow(maskRidgeInitial, "4 - Initial mask");
 		// for visualization, and the points of contour put in a MatOfPoint variable
 		orientationRidge.contourMask(this.segmentedRidge, maskRidgeInitial);
 		Mat maskRidge = orientationRidge.mask;
-		//resizeAndShow(maskRidge, "4 - Mask ridge");
-		Mat normalizedMask = new Mat(size, CvType.CV_32FC1);
-		Core.divide(maskRidge, Scalar.all(255), normalizedMask);	
+		// resizeAndShow(maskRidge, "4 - Mask ridge");
+
+//		Mat normalizedMask = new Mat(size, CvType.CV_32FC1);
+//		Core.divide(maskRidge, Scalar.all(255), normalizedMask);
 		boolean recoverableImage = orientationRidge.roiCheck();
 		// to do
 //		if (!recoverableImage)
 //			return;
-	
+
 		/***********
 		 * 5. step: orienation field calculation
 		 ************/
@@ -146,17 +152,17 @@ public class ImageProcessing {
 //				orientSmoothSigma);
 		ridgeOrientation = orientationRidge.orientation;
 		Core.normalize(ridgeOrientation, this.ridgeOrientationShow, 0, 255, Core.NORM_MINMAX, CvType.CV_8UC1);
-		//resizeAndShow(ridgeOrientationShow, "5 - Oriented ridge");
+		// resizeAndShow(ridgeOrientationShow, "5 - Oriented ridge");
 		this.orientation = new Mat(source.size(), source.type());
 		orientation = orientationRidge.avgBlockForDraw(segmentedRidge);
 		orientation = orientationRidge.drawGrid(orientation);
-		//resizeAndShow(orientation, "5 - Oriented ridge");
+		// resizeAndShow(orientation, "5 - Oriented ridge");
 		/***********
 		 * 6. step: ridge frequency calculation
 		 ************/
 		Mat ridgeFrequencyRidge = new Mat(size, CvType.CV_32FC1);
 		double medianFrequencyRidge = orientationRidge.ridgeFrequency(this.segmentedRidge, maskRidge, ridgeOrientation,
-				ridgeFrequencyRidge, fBlockSize, fWindowSize, fMinWaveLength, fMaxWaveLength);
+				ridgeFrequencyRidge, frequencyBlockSize, frequencyWindowSize, minWaveLength, maxWaveLength);
 //		Mat filteredRidge1 = orientationRidge.gaborFilter1(segmentedRidge, ridgeOrientation);
 //		Core.normalize(filteredRidge1, filteredRidge1, 0, 255, Core.NORM_MINMAX, CvType.CV_8UC1);
 //		resizeAndShow(filteredRidge1, "Gabor");
@@ -165,87 +171,83 @@ public class ImageProcessing {
 		 ************/
 		Mat filteredRidge = new Mat(size, CvType.CV_32FC1);
 		this.segmentedRidge.convertTo(this.segmentedRidge, CvType.CV_32FC1);
-		orientationRidge.ridgeFilter(this.segmentedRidge, ridgeOrientation, ridgeFrequencyRidge, filteredRidge, filterSize,
-				filterSize, medianFrequencyRidge);
+		orientationRidge.ridgeFilter(this.segmentedRidge, ridgeOrientation, ridgeFrequencyRidge, filteredRidge,
+				filterSize, filterSize, medianFrequencyRidge);
 		this.filteredRidgeShow = new Mat(size, CvType.CV_32FC1);
 		Core.normalize(filteredRidge, this.filteredRidgeShow, 0, 255, Core.NORM_MINMAX, CvType.CV_8UC1);
-		//resizeAndShow(filteredRidgeShow, "7 - Filtered ridge (Gabor)");
-		
+		// resizeAndShow(filteredRidgeShow, "7 - Filtered ridge (Gabor)");
+
 		/***********
 		 * 8. step: adaptive binarization
 		 ************/
 		filteredRidge.convertTo(filteredRidge, CvType.CV_8UC3);
 		this.binarizedRidge = binarizeAdaptive(filteredRidge);
+
 		Mat binarizedValley = new Mat(source.size(), source.type());
 		Core.bitwise_not(this.binarizedRidge, binarizedValley);
-		//resizeAndShow(binarizedValley, "8 - Binarized valley");
+		// resizeAndShow(binarizedValley, "8 - Binarized valley");
 
 		// nem adaptív
-		//Imgproc.threshold(filteredRidge, binarizedRidge, 0, 255, Imgproc.THRESH_BINARY);
-		//resizeAndShow(binarizedRidge, "8 - Binarized ridge");
+		// Imgproc.threshold(filteredRidge, binarizedRidge, 0, 255,
+		// Imgproc.THRESH_BINARY);
+		// resizeAndShow(binarizedRidge, "8 - Binarized ridge");
 
 		/***********
-		 * 9. step: thinning
-		 * 1, thin the binarized ridge image
-		 * 2, thin the binarized valley image (= inverse of the binarized ridge image)
+		 * 9. step: thinning 1, thin the binarized ridge image 2, thin the binarized
+		 * valley image (= inverse of the binarized ridge image)
 		 ************/
-		Mat thinnedRidge = thinning(this.binarizedRidge);
+		thinnedRidge = thinning(this.binarizedRidge);
 		// resizeAndShow(thinnedRidge, "6 - Ridge Thinned");
 		Mat invertMask = Extraction.contourNonZeroPoints(thinnedRidge);
 		Mat finalBinarizedValley = Extraction.maskInverted(binarizedValley, invertMask);
-		//resizeAndShow(finalBinarizedValley, "Segmented bin invert");
+		// resizeAndShow(finalBinarizedValley, "Segmented bin invert");
 
-		Mat thinnedValley = thinning(finalBinarizedValley);
+		thinnedValley = thinning(finalBinarizedValley);
 		// resizeAndShow(thinnedValley, "6 - Valley Thinned");
-
 		/***********
-		 * 10. step: small lakes, dots elimination from thinned image
+		 * 10. step: preprocessing: small lakes, dots, short ridges elimination from
+		 * thinned image
 		 ************/
-		this.openedRidge = opening(thinnedRidge);
-		//resizeAndShow(openedRidge, "7 - Ridge w/o small lakes");
+		Mat openedRidge = opening(this.thinnedRidge);
+		// resizeAndShow(openedRidge, "7 - Ridge w/o small lakes");
 		// avgRidgeDistance = stepsRidge.avgRidgeDistance(openedRidge);
-		Mat openedValley = opening(thinnedValley);
-		//resizeAndShow(openedValley, "7 - Valley w/o small lakes");
+		openedValley = opening(this.thinnedValley);
+		// resizeAndShow(openedValley, "7 - Valley w/o small lakes");
 
 		/***********
-		 * 11, step: instanciate the RidgesMap class for mark all possible minutiae
-		 * - keresztszám módszerrel kiszámolja a lehetséges minucia pontokat
-		 * - betölti a set adattagba 
-		 * - kiszámítja minden minuciához a hozzá tartozó redõvonalak adatait:
-		 * (a létrehozott vékonyított kép LogicMatrix (0 - white, 1 - black) példányából) 
-		 * 		a, ha végzõdés (terminations Set-be a pixelpontokat, angleTerm - a szög
-		 * 		b, ha elágazás (bifurcations Set-be a pixelpontoakt, 
-		 * 			minden ág kezdõ és végpontját, azok szögeit
-		 * 	 
-		 1, terminations (ha minucia egy végzõdés, ebbe a Set-be menti a redõ
-		 pixelpontokat)
-		 2, bifurcations (ha minucia egy elágazás, ebbe a Set-be menti a redõ
-		 pixelpontokat)
-		 3, neighbours (minucia közvetlen szomszédok - általában 3 darab)
-		 4, farpoints (ha a minucia elágazás, akkor a minuciaponttól legtávolabbra esõ
-		 pont a bifurcations Set-be elmentett pixelpontok közül)
-		 5, pointpairs (ha a minucia elágazás, képzi az összetartozó
-		 neighbours-farpoints párokat)
-		 6, angles (ha a minucia elágazás, elmenti egy 3 darabos Double Set-be a
-		 pointpairs által megadott szakaszok irányszögét)
-		 kiszámolja a minuciától legtávolabbi elágazási pontokat,
-		 és beletölti a Ridges fairpoints adattagjának Set-jébe
-		 nem a farPoints és a minuciapont, hanem farpoints és közeli szomszédok között
-		 számolja az irányt - és betölti a Ridges pointpairs adattagjába
-		 minden végzõdés minuciához (Cell) kiszámolja annak irányszögét
-		 minden elágazáshoz (Cell mutatja a helyet) tartozik a 3 darab redõvonal szöge
+		 * 11, step: instanciate the RidgesMap class for mark all possible minutiae -
+		 * keresztszám módszerrel kiszámolja a lehetséges minucia pontokat - betölti a
+		 * set adattagba - kiszámítja minden minuciához a hozzá tartozó redõvonalak
+		 * adatait: (a létrehozott vékonyított kép LogicMatrix (0 - white, 1 - black)
+		 * példányából) a, ha végzõdés (terminations Set-be a pixelpontokat, angleTerm -
+		 * a szög b, ha elágazás (bifurcations Set-be a pixelpontoakt, minden ág kezdõ
+		 * és végpontját, azok szögeit
+		 * 
+		 * 1, terminations (ha minucia egy végzõdés, ebbe a Set-be menti a redõ
+		 * pixelpontokat) 2, bifurcations (ha minucia egy elágazás, ebbe a Set-be menti
+		 * a redõ pixelpontokat) 3, neighbours (minucia közvetlen szomszédok - általában
+		 * 3 darab) 4, farpoints (ha a minucia elágazás, akkor a minuciaponttól
+		 * legtávolabbra esõ pont a bifurcations Set-be elmentett pixelpontok közül) 5,
+		 * pointpairs (ha a minucia elágazás, képzi az összetartozó neighbours-farpoints
+		 * párokat) 6, angles (ha a minucia elágazás, elmenti egy 3 darabos Double
+		 * Set-be a pointpairs által megadott szakaszok irányszögét) kiszámolja a
+		 * minuciától legtávolabbi elágazási pontokat, és beletölti a Ridges fairpoints
+		 * adattagjának Set-jébe nem a farPoints és a minuciapont, hanem farpoints és
+		 * közeli szomszédok között számolja az irányt - és betölti a Ridges pointpairs
+		 * adattagjába minden végzõdés minuciához (Cell) kiszámolja annak irányszögét
+		 * minden elágazáshoz (Cell mutatja a helyet) tartozik a 3 darab redõvonal szöge
 		 * - a végsõ eredményt Minutiae -> Ridges map - be töltjük
 		 ************/
 		// params: vékonyított kép
-		RidgesMap ridgesMapRidge = new RidgesMap(this.openedRidge);
-		RidgesMap ridgesMapValley = new RidgesMap(openedValley);
+		RidgesMap ridgesMapRidge = new RidgesMap(openedRidge);
+		RidgesMap ridgesMapValley = new RidgesMap(this.openedValley);
 		// beállítjuk a végzõdések szögeit ridge és valley képen egyaránt
 		ridgesMapRidge.setOrientationForTermination();
 		ridgesMapValley.setOrientationForTermination();
 		// ridge képen az elágazások szögeit is kiszámítja
 		// (a valley kép végzõdés szögei alapján)
 		ridgesMapRidge.calculateBifurcation(ridgesMapValley.getMinutiaeMapFinal());
-		
+
 		// a felderített végzõdések és elágazásokhoz tartozó redõágak
 		// a redõképen
 		Mat terminationsRidge = ridgesMapRidge.terminationMatrix();
@@ -258,49 +260,55 @@ public class ImageProcessing {
 //		resizeAndShow(terminationsValley, "9 - Valley Terminations");
 //		resizeAndShow(bifurcationsValley, "9 - Valley Bifurcations");
 
-		/*********** 12. lépés: a redõkép és duálja (barázdakép) megadása
-		 * az álminucia eltávolító osztály számára -> példányosítás
-		 * params: 1. redõkép, 2. a hozzá tartozó barázdakép ************/
+		/***********
+		 * 12. lépés: a redõkép és duálja (barázdakép) megadása az álminucia eltávolító
+		 * osztály számára -> példányosítás params: 1. redõkép, 2. a hozzá tartozó
+		 * barázdakép
+		 ************/
 		Extraction extractionRidge = new Extraction(ridgesMapRidge, ridgesMapValley);
 		// összes lehetséges minucia irányszögének megjelenítése
 		this.withAnglesRidge = extractionRidge.drawMinutiaeDirection();
-		//resizeAndShow(withAnglesRidge, "10 - Ridge w/t angles");
+		// resizeAndShow(withAnglesRidge, "10 - Ridge w/t angles");
 		// minucia pontok megadása a redõképen megjelenítve
-		Mat allInRidge = extractionRidge.allMinutia();
-		//resizeAndShow(allInRidge, "All minutiae in ridge");
-			
+//		Mat allInRidge = extractionRidge.allMinutia();
+//		resizeAndShow(allInRidge, "All minutiae in ridge");
+
 		/*********** 16. lépés: perem meghatározás ************/
 		// a maszkot most a vékonyított képbõl képezzük
-		Mat nonBlockMask = Extraction.contourNonZeroPoints(this.openedRidge);
-		//resizeAndShow(nonBlockMask, "12 - Ridge Mask from Thinned");
-		Mat borderRidgeMask = Extraction.scaleContour(Extraction.roiContour, 0.85, nonBlockMask);
-		//resizeAndShow(borderRidgeMask, "12 - Ridge border mask");
-		
-		/*********** 13. step: false minutiae elimination ************/
-		// 1. lépés: elszigetelt pontok eltávolítása
-		extractionRidge.eliminationDot();
-		// 2. lépés: apró tavak, szigetek eltávolítása
-		extractionRidge.eliminationPore();
-		// 3. lépés: elágazásból végzõdés lehet, ha a duál barázdaképen ezt az elágazást
-		//           éppen két olyan végzõdés fogja közre, mely szakadás miatt nem valós
-		extractionRidge.changeType();
-		extractionRidge.changeType2();
-		// 4. lépés: túl közeli végzõdések törlése
-		extractionRidge.eliminationTooNearTerm();
-		// 5. lépés: redõszakadások eltávolítása 
-		extractionRidge.eliminationGap();
-		// 6. lépés: nyúlványok eltávolítása
-		extractionRidge.eliminationSpur();
-		// 7. lépés: H-pontok eltávolítása
-		extractionRidge.eliminationHpoint();
+		Mat nonBlockMask = Extraction.contourNonZeroPoints(openedRidge);
+		// resizeAndShow(nonBlockMask, "12 - Ridge Mask from Thinned");
+		Mat borderRidgeMask = Extraction.scaleContour(Extraction.roiContour, 0.8, nonBlockMask);
+		// resizeAndShow(borderRidgeMask, "12 - Ridge border mask");
 
+		/*********** 13. step: false minutiae elimination ************/
+		// 0/1. lépés: elszigetelt pontok eltávolítása
+		extractionRidge.eliminationDot();
+		// 0/2. lépés: apró tavak, szigetek eltávolítása
+		extractionRidge.eliminationLake();
+		// 0/3. lépés: típust váltó minuciák
+		extractionRidge.changeType();
+		extractionRidge.changeTypeInverse();
+		extractionRidge.changeType2();
+		// 0/3. lépés: túl közeli végzõdések törlése
+		extractionRidge.eliminationTooNearTerm();
+		// 1. lépés: redõszakadások eltávolítása
+		extractionRidge.eliminationGap();
+		// 2. lépés: nyúlványok eltávolítása
+		extractionRidge.eliminationSpur();
+		// 3. lépés: H-pontok eltávolítása
+		extractionRidge.eliminationHpoint();
+		// 4/1. step: too near minutiae
+		extractionRidge.eliminationTooNearMinutiae();
+		// 4/2. step: not real minutiae elimination
+		// extractionRidge.notRealMinutiae();
 		/*********** 15. lépés: perem minutiae eltávolítás ************/
 		// 8. lépés: peremen lévõ végzõdések eltávolítása
 		extractionRidge.borderMask(borderRidgeMask);
 		this.minutiaeExtractedRidge = extractionRidge.drawMinutiaeDirection();
-		//resizeAndShow(minutiaeExtractedRidge, "13 - Ridge w/o border minutiae");
+		// resizeAndShow(minutiaeExtractedRidge, "13 - Ridge w/o border minutiae");
 
-		// a Controller osztály számára megadjuk a minucialistát a minucia set azonosítóhoz
+		// a Controller osztály számára megadjuk a minucialistát a minucia set
+		// azonosítóhoz
 		this.finalMinutiaeSet = sortByMinutiae(ridgesMapRidge.getMinutiaeMapFinal().keySet());
 		System.out.println("Final state");
 		System.out.println("Terminations Ridges: ");
@@ -324,11 +332,12 @@ public class ImageProcessing {
 //		resizeAndShow(combinated, "Combinated sceleton");
 
 		finalMinutiaeSet = sortByMinutiae(ridgesMapRidge.getMinutiaeMapFinal().keySet());
-		
+
 	}
 
-
-	/**getters
+	/**
+	 * getters
+	 * 
 	 * @return
 	 */
 	public Mat getSource() {
@@ -350,7 +359,7 @@ public class ImageProcessing {
 	public Mat getOrientation() {
 		return orientation;
 	}
-	
+
 	public Mat getSegmentedRidge() {
 		return segmentedRidge;
 	}
@@ -359,8 +368,16 @@ public class ImageProcessing {
 		return filteredRidgeShow;
 	}
 
-	public Mat getOpenedRidge() {
-		return openedRidge;
+	public Mat getThinnedRidge() {
+		return thinnedRidge;
+	}
+
+	public Mat getThinnedValley() {
+		return thinnedValley;
+	}
+
+	public Mat getOpenedValley() {
+		return openedValley;
 	}
 
 	public Mat getBinarizedRidge() {
@@ -388,12 +405,12 @@ public class ImageProcessing {
 	// általános segédfüggvény: frame-ben megjeleníti a megadott
 	// Mat-objectumot
 	public static void imshow(Mat matrix, String name) throws IOException {
-		MatOfByte matOfByte = new MatOfByte(); 
+		MatOfByte matOfByte = new MatOfByte();
 		Imgcodecs.imencode(".bmp", matrix, matOfByte);
 		byte[] byteArray = matOfByte.toArray();
 		InputStream in = new ByteArrayInputStream(byteArray);
-		BufferedImage bufImage = ImageIO.read(in); 
-		JFrame frame = new JFrame(); 
+		BufferedImage bufImage = ImageIO.read(in);
+		JFrame frame = new JFrame();
 		frame.getContentPane().add(new JLabel(new ImageIcon(bufImage)));
 		frame.pack();
 		frame.setTitle(name);
@@ -402,7 +419,9 @@ public class ImageProcessing {
 		frame.setVisible(true);
 	}
 
-	/**equalizes a Mat object
+	/**
+	 * histogram equalizes in Mat object
+	 * 
 	 * @param input
 	 * @return
 	 */
@@ -411,14 +430,29 @@ public class ImageProcessing {
 		Imgproc.equalizeHist(input, equalized);
 		return equalized;
 	}
+	
+	/** adaptive histogram equalizes in Mat object
+	 * @param input
+	 * @return
+	 * @throws IOException 
+	 */
+	public Mat equalizeAdaptiveOpenCV(Mat input) throws IOException {
+		Mat equalized = new Mat(size, CvType.CV_32FC1);
+		CLAHE clahe = Imgproc.createCLAHE(10, new Size(13, 13));
+		clahe.apply(input, equalized);
+		Imgproc.equalizeHist(input, equalized);
+		resizeAndShow(equalized, "Clahe");
+		return equalized;
+	}
 
 	/***********
-	 * 2. step: normalization: equalized -> 
-	 * normalized values between 0 and 1 
-	 * mean zero, unit std dev.
+	 * 2. step: normalization: equalized -> normalized values between 0 and 1 mean
+	 * zero, unit std dev.
 	 ************/
 
-	/**normalizes a Mat object
+	/**
+	 * normalizes a Mat object
+	 * 
 	 * @param src
 	 * @param dst
 	 */
@@ -431,28 +465,23 @@ public class ImageProcessing {
 		Core.divide(dst, Scalar.all(std.toArray()[0]), dst);
 	}
 
-	/**thinning operation
+	/**
+	 * thinning operation
+	 * 
 	 * @param input
 	 * @return
 	 * @throws IOException
 	 */
 	public Mat thinning(Mat input) throws IOException {
-		Mat output = new Mat(input.size(), input.type());
-		double [][] pixels = new double[height][width];
-		for (int i = 0; i < height; i++) {
-			for (int j = 0; j < width; j++) {
-				double[] data = input.get(i, j);
-				pixels[i][j] = data[0];
-			}
-		}
-		ThinnedImage thinnedImage = new ThinnedImage(pixels);
-		thinnedImage.thinImage();
-		output = arrayToMat(pixels);
-		return output;
+		ThinnedImage thinnedImage = new ThinnedImage(input);
+		Mat out = thinnedImage.thinned;
+		return out;
 	}
-	
-	/**morphology operation for elimination of small islands, 
-	 * ridge lines (like noise)
+
+	/**
+	 * morphology operation for elimination of small islands, ridge lines (like
+	 * noise)
+	 * 
 	 * @param input
 	 * @return
 	 * @throws IOException
@@ -494,9 +523,10 @@ public class ImageProcessing {
 	 * Functions auxiliary
 	 ************/
 
-	/** unifies the two type of thinned image:
-	 * ridge image - valley image in one thinned image
-	 * for visualization
+	/**
+	 * unifies the two type of thinned image: ridge image - valley image in one
+	 * thinned image for visualization
+	 * 
 	 * @param ridge
 	 * @param valley
 	 * @return
@@ -507,11 +537,11 @@ public class ImageProcessing {
 			for (int j = 0; j < width; j++) {
 				double[] data = ridge.get(i, j);
 				double[] outData = new double[ridge.channels()];
-				if (data[0] == 0) { 
+				if (data[0] == 0) {
 					outData[0] = 254;
 					outData[1] = 0;
 					outData[2] = 0;
-				} else { 
+				} else {
 					outData[0] = 255;
 					outData[1] = 255;
 					outData[2] = 255;
@@ -551,8 +581,10 @@ public class ImageProcessing {
 		return out;
 	}
 
-	/** calculates the distance between two given points
-	 * @param a 
+	/**
+	 * calculates the distance between two given points
+	 * 
+	 * @param a
 	 * @param b
 	 * @return
 	 */
@@ -562,7 +594,9 @@ public class ImageProcessing {
 		return Math.sqrt(x_quad + y_quad);
 	}
 
-	/** calculates the distance between two given points
+	/**
+	 * calculates the distance between two given points
+	 * 
 	 * @param a
 	 * @param b
 	 * @return
@@ -577,10 +611,10 @@ public class ImageProcessing {
 		return new Cell((int) p.x, (int) p.y);
 	}
 
-	/**sort minutiae by
-	 * first: type of minutiae (ending, then bifurcation)
-	 * second: x coordinate 
-	 * third: y coordinate
+	/**
+	 * sort minutiae by first: type of minutiae (ending, then bifurcation) second: x
+	 * coordinate third: y coordinate
+	 * 
 	 * @param input
 	 * @return
 	 */
@@ -591,9 +625,11 @@ public class ImageProcessing {
 		return arrayList;
 	}
 
-	/** the angle of line session given by two input coordinates points
-	 * if the angle < 0 -> [0,-PI] -> I. and II. quadrant
-	 * if the angle > 0 -> [0,PI] -> III. and IV. quadrant
+	/**
+	 * the angle of line session given by two input coordinates points if the angle
+	 * < 0 -> [0,-PI] -> I. and II. quadrant if the angle > 0 -> [0,PI] -> III. and
+	 * IV. quadrant
+	 * 
 	 * @param cell1
 	 * @param cell2
 	 * @return
@@ -603,17 +639,19 @@ public class ImageProcessing {
 		double y = cell2.y - cell1.y;
 		return Math.atan2(y, x);
 	}
-	
-	/**convert angle in [-PI,PI] to [0,2*PI]
-	 * the angle increments in clockwise (- direction)
+
+	/**
+	 * convert angle in [-PI,PI] to [0,2*PI] the angle increments in clockwise (-
+	 * direction)
+	 * 
 	 * @param angle
 	 * @return always in Radians
 	 */
 	public static double orientationForFullAngle(double angle) {
 		if (angle >= 0)
 			return angle;
-		else 
-			return angle + (2*Math.PI);
+		else
+			return angle + (2 * Math.PI);
 	}
 
 	public static boolean angleConcordant(double angle1, double angle2) {
@@ -623,8 +661,9 @@ public class ImageProcessing {
 			return false;
 	}
 
-
-	/**the angle of line session given by two points
+	/**
+	 * the angle of line session given by two points
+	 * 
 	 * @param cell1
 	 * @param cell2
 	 * @return
@@ -635,7 +674,9 @@ public class ImageProcessing {
 		return Math.atan2(y, x);
 	}
 
-	/**exam whether one point is in the given distance from the other point, or not
+	/**
+	 * exam whether one point is in the given distance from the other point, or not
+	 * 
 	 * @param p
 	 * @param q
 	 * @param r
@@ -648,7 +689,9 @@ public class ImageProcessing {
 			return false;
 	}
 
-	/**exam whether one point is in the given distance from the other point, or not
+	/**
+	 * exam whether one point is in the given distance from the other point, or not
+	 * 
 	 * @param p
 	 * @param q
 	 * @param r
@@ -688,7 +731,9 @@ public class ImageProcessing {
 		return sb.toString();
 	}
 
-	/**calculate the other Point coordinate of a line session in a given angle
+	/**
+	 * calculate the other Point coordinate of a line session in a given angle
+	 * 
 	 * @param fi
 	 * @param p1
 	 * @param r
@@ -702,8 +747,10 @@ public class ImageProcessing {
 		p2.y = Math.sin(fi) * r + p1.y;
 		return p2;
 	}
-	
-	/**binarizes the image
+
+	/**
+	 * binarizes the image
+	 * 
 	 * @param input
 	 * @return
 	 */
@@ -713,17 +760,19 @@ public class ImageProcessing {
 		return binarized;
 	}
 
-	/**adaptive binarization of image
+	/**
+	 * adaptive binarization of image
+	 * 
 	 * @param input
 	 * @return
 	 */
 	public static Mat binarizeAdaptive(Mat input) {
-		//Imgproc.cvtColor(input, input, Imgproc.COLOR_RGB2GRAY);
+		// Imgproc.cvtColor(input, input, Imgproc.COLOR_RGB2GRAY);
 		Mat binarized = new Mat(input.size(), input.type());
 		Imgproc.adaptiveThreshold(input, binarized, 255, Imgproc.ADAPTIVE_THRESH_MEAN_C, Imgproc.THRESH_BINARY, 15, 12);
 		return binarized;
 	}
-	
+
 	/***********
 	 * Static class for comparing Minutiae
 	 ************/
@@ -747,7 +796,7 @@ public class ImageProcessing {
 		}
 
 	}
-	
+
 	public static Mat normalize(Mat input) {
 		Mat out = input.clone();
 		MatOfDouble mean = new MatOfDouble();
@@ -756,7 +805,7 @@ public class ImageProcessing {
 		double meanImage = mean.get(0, 0)[0];
 		double varImage = dev.get(0, 0)[0];
 		double pixelValue = 0;
-		double expectedMean = meanImage - 15; 
+		double expectedMean = meanImage - 15;
 		double expectedVar = varImage - 15;
 		System.out.println("mean: " + meanImage + " var: " + varImage);
 		for (int i = 0; i < height; i++) {
@@ -773,8 +822,6 @@ public class ImageProcessing {
 			}
 		}
 		return out;
-	}	
+	}
 
-	
-	
 }

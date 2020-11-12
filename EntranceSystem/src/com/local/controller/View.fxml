@@ -96,7 +96,8 @@
                         <AnchorPane id="edit" minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
                            <children>
                               <TextField id="editName" fx:id="editFirstname" layoutX="14.0" layoutY="14.0" prefHeight="25.0" prefWidth="256.0" promptText="First name" />
-                              <Button layoutX="416.0" layoutY="159.0" mnemonicParsing="false" onAction="#buttonEdit" prefHeight="27.0" prefWidth="100.0" text="Edit" />
+                              <Button fx:id="editButton" layoutX="416.0"  layoutY="159.0" mnemonicParsing="false" onAction="#buttonEdit" prefHeight="27.0" prefWidth="100.0" text="Edit" />
+                              <Button fx:id="adminButton" visible="false" layoutX="416.0"  layoutY="159.0" mnemonicParsing="false" onAction="#buttonAdmin" prefHeight="27.0" prefWidth="150.0" text="Edit by Admin" />
                               <TextArea id="editFinger" fx:id="editFinger" editable="false" layoutX="322.0" layoutY="14.0" prefHeight="113.0" prefWidth="555.0" promptText="Minutiae array" wrapText="true">
                                  <font>
                                     <Font size="11.0" />
@@ -105,7 +106,7 @@
                               <TextField id="editName" fx:id="editOccupation" layoutX="15.0" layoutY="88.0" prefHeight="25.0" prefWidth="256.0" promptText="Occupation" />
                               <TextField id="editPassword" fx:id="editPassword" layoutX="15.0" layoutY="125.0" prefHeight="25.0" prefWidth="256.0" promptText="Password" />
                               <Button layoutX="776.0" layoutY="159.0" mnemonicParsing="false" onAction="#buttonLogout" prefHeight="27.0" prefWidth="100.0" text="Logout" />
-                              <Button layoutX="544.0" layoutY="159.0" mnemonicParsing="false" onAction="#buttonImportImage" prefHeight="27.0" prefWidth="201.0" text="Import image" />
+                              <Button fx:id="importButton" layoutX="544.0" layoutY="159.0" mnemonicParsing="false" onAction="#buttonImportImage" prefHeight="27.0" prefWidth="201.0" text="Import image" />
                            </children>
                         </AnchorPane>
                      </content>
@@ -135,6 +136,8 @@
                         <MenuItem mnemonicParsing="false" onAction="#menuFilter" style="-fx-text-fill: black;" text="Gabor Filtered" />
                         <MenuItem mnemonicParsing="false" onAction="#menuBinarize" style="-fx-text-fill: black;" text="Binarized" />
                         <MenuItem mnemonicParsing="false" onAction="#menuThin" style="-fx-text-fill: black;" text="Thinned" />
+                        <MenuItem mnemonicParsing="false" onAction="#menuValley" style="-fx-text-fill: black;" text="Thinned valley" />
+                        <MenuItem mnemonicParsing="false" onAction="#menuPreprocessing" style="-fx-text-fill: black;" text="Valley after preprocessing" />
                         <MenuItem mnemonicParsing="false" onAction="#menuMinutiaeAll" style="-fx-text-fill: black;" text="All candidate minutiae" />
                         <MenuItem mnemonicParsing="false" onAction="#menuMinutiaeExtracted" style="-fx-text-fill: black;" text="Extracted minutiae" />
                      </items>

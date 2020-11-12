@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -45,9 +46,13 @@ public class Extraction {
 	 * eltávolítása (végzõdés, elágazás is) 5. perem minuciák eltávolítása
 	 ******************************************************************************/
 
-	/************************* I. FALSE TERMINATION ELIMINATION *******************/
+	/*************************
+	 * I. FALSE TERMINATION ELIMINATION according to ZHAO algorithm
+	 *******************/
 
-	// 1. lépés: egyedülálló pontok eltávolítása
+	/*
+	 * 0/0. step: dots elimination if rested after preprocessing
+	 */
 	public void eliminationDot() throws IOException {
 		Mat out = this.ridge.getMatrix().clone();
 		Set<Minutiae> section = new HashSet<>();
@@ -60,35 +65,37 @@ public class Extraction {
 		for (Minutiae minutia : section) {
 			ridge.removeRecord(minutia);
 		}
-		//resizeAndShow(out, "túl kicsi term");
+		// resizeAndShow(out, "too short term");
 	}
 
-	// 2. lépés: apró tavak, szigetek eltávolítása
-	public void eliminationPore() throws IOException {
+	/*
+	 * 0/1. step: lakes elimination if rested after preprocessing
+	 */
+	public void eliminationLake() throws IOException {
 		Mat out = this.ridge.getMatrix().clone();
 		Set<Minutiae> section = new HashSet<>();
 		for (Map.Entry<Minutiae, Ridges> termExt : valley.getMinutiaeMapFinal().entrySet()) {
 			for (Map.Entry<Minutiae, Ridges> termInt : valley.getMinutiaeMapFinal().entrySet()) {
 				if (termExt.getKey().getType().equals("ending") && termInt.getKey().getType().equals("ending")
 						&& !termExt.getKey().getLocation().equals(termInt.getKey().getLocation())
-						&& distanceEuclidean(termExt.getKey().getLocation(), termInt.getKey().getLocation()) < 25) {
+						&& distanceEuclidean(termExt.getKey().getLocation(), termInt.getKey().getLocation()) < 30) {
 					for (Map.Entry<Minutiae, Ridges> bifExt : ridge.getMinutiaeMapFinal().entrySet()) {
 						for (Map.Entry<Minutiae, Ridges> bifInt : ridge.getMinutiaeMapFinal().entrySet()) {
 							if (bifExt.getKey().getType().equals("bifurcation")
 									&& bifInt.getKey().getType().equals("bifurcation")
 									&& !bifExt.getKey().getLocation().equals(bifInt.getKey().getLocation())
 									&& distanceEuclidean(bifExt.getKey().getLocation(),
-											bifInt.getKey().getLocation()) < 35) {
+											bifInt.getKey().getLocation()) < 40) {
 								if ((distanceEuclidean(bifExt.getKey().getLocation(),
-										termExt.getKey().getLocation()) < 5
+										termExt.getKey().getLocation()) < 6
 										|| distanceEuclidean(bifExt.getKey().getLocation(),
-												termInt.getKey().getLocation()) < 5)
+												termInt.getKey().getLocation()) < 6)
 										&& (distanceEuclidean(bifInt.getKey().getLocation(),
-												termExt.getKey().getLocation()) < 5
+												termExt.getKey().getLocation()) < 6
 												|| distanceEuclidean(bifInt.getKey().getLocation(),
-														termInt.getKey().getLocation()) < 5)) {
+														termInt.getKey().getLocation()) < 6)) {
 									boolean containTerm = false;
-									boolean containBif = false;
+//									boolean containBif = false;
 									double distanceBif = distanceEuclidean(bifExt.getKey().getLocation(),
 											bifInt.getKey().getLocation());
 									double distanceTerm = distanceEuclidean(termExt.getKey().getLocation(),
@@ -97,15 +104,15 @@ public class Extraction {
 										if (termInt.getValue().terminations.contains(c))
 											containTerm = true;
 									}
-									for (Cell c : bifExt.getValue().bifurcations) {
-										if (bifInt.getValue().bifurcations.contains(c))
-											containBif = true;
-									}
-									if (containTerm && containBif && distanceBif > distanceTerm) {
+//									for (Cell c : bifExt.getValue().bifurcations) {
+//										if (bifInt.getValue().bifurcations.contains(c))
+//											containBif = true;
+//									}
+									if (containTerm) {
 										section.add(bifExt.getKey());
 										section.add(bifInt.getKey());
-										Imgproc.circle(out, bifExt.getKey().getLocation(), 3, red);
-										Imgproc.circle(out, bifInt.getKey().getLocation(), 3, red);
+										Imgproc.circle(out, bifExt.getKey().getLocation(), 3, purple);
+										Imgproc.circle(out, bifInt.getKey().getLocation(), 3, purple);
 									}
 								}
 							}
@@ -117,7 +124,7 @@ public class Extraction {
 		for (Minutiae minutia : section) {
 			ridge.removeRecord(minutia);
 		}
-		//resizeAndShow(out, "redõsziget");
+		//resizeAndShow(out, "Marked lakes");
 	}
 
 	public double convertHalfAngle(double angle) {
@@ -150,11 +157,123 @@ public class Extraction {
 		return result;
 	}
 
-	// 3. lépés: redõképen lévõ elágazásból -> végzõdés lehet, ha
-	// a barázdaképen az iménti elágazást közrefogja két végzõdés, melyhez elágazás
-	// van közel,
-	// így a két végzõdést csak az elágazás egyik ágában lévõ redõszakadás okozza
+	/*
+	 * 0/2. step: too near terminations
+	 */
+	public void eliminationTooNearTerm() throws IOException {
+		Mat out = this.ridge.getMatrix().clone();
+		Set<Minutiae> section = new HashSet<>();
+		for (Minutiae termExt : ridge.getMinutiaeMapFinal().keySet()) {
+			for (Minutiae termInt : ridge.getMinutiaeMapFinal().keySet()) {
+				if (termExt.getType().equals("ending") && termInt.getType().equals("ending")
+						&& !termExt.getLocation().equals(termInt.getLocation())
+						&& distanceEuclidean(termExt.getLocation(), termInt.getLocation()) <= 5) {
+					section.add(termExt);
+					section.add(termInt);
+					Imgproc.circle(out, termExt.getLocation(), 3, red);
+					Imgproc.circle(out, termInt.getLocation(), 3, red);
+				}
+
+			}
+		}
+		for (Minutiae m : section) {
+			ridge.removeRecord(m);
+		}
+		// resizeAndShow(out, "Too near terms");
+	}
+
+	/*
+	 * 1/1. step: islands in ridge (gaps) elimination - in ridge the distance
+	 * between 2 terminations < 12 - the difference of ang1 of one termination and
+	 * ang2 of other is within [0,15] (deg) - if the line session(term1, term2) =
+	 * session -> the difference between session and ang1 || difference between
+	 * session and ang2 is within [0,15] (deg)
+	 */
+	public void eliminationGap() throws IOException {
+		Mat out = ridge.getMatrix().clone();
+		Set<Minutiae> section = new HashSet<>();
+		// minutiaeListRidge.removeAll(hpointsValley);????
+		double low = Math.toRadians(0);
+		double high = Math.toRadians(20);
+		for (Map.Entry<Minutiae, Ridges> minExt : this.ridge.getMinutiaeMapFinal().entrySet()) {
+			for (Map.Entry<Minutiae, Ridges> minInt : this.ridge.getMinutiaeMapFinal().entrySet()) {
+				if (minExt.getKey().getType().equals("ending") && minInt.getKey().getType().equals("ending")
+						&& distanceEuclidean(minExt.getKey().getLocation(), minInt.getKey().getLocation()) < 20
+						&& distanceEuclidean(minExt.getKey().getLocation(), minInt.getKey().getLocation()) != 0) {
+					double sessionAngle = orientation(pointToCell(minExt.getKey().getLocation()),
+							pointToCell(minInt.getKey().getLocation()));
+					sessionAngle = angleTransform(sessionAngle);
+					double minExtAngle = angleTransform(minExt.getKey().getOrientation());
+					double minIntAngle = angleTransform(minInt.getKey().getOrientation());
+					boolean contain = false;
+					for (Cell c : minExt.getValue().terminations) {
+						if (minInt.getValue().terminations.contains(c))
+							contain = true;
+					}
+					if (((Math.abs(minExtAngle - sessionAngle) < high) || (Math.abs(minIntAngle - sessionAngle) < high))
+							&& Math.abs(minExtAngle - minIntAngle) < high || contain) {
+						section.add(minExt.getKey());
+						section.add(minInt.getKey());
+						Imgproc.circle(out, minExt.getKey().getLocation(), 4, new Scalar(0, 0, 255));
+						Imgproc.circle(out, minInt.getKey().getLocation(), 4, new Scalar(0, 0, 255));
+					}
+				}
+			}
+		}
+		for (Minutiae m : section) {
+			ridge.removeRecord(m);
+		}
+		// resizeAndShow(out, "ridge breaks");
+	}
+
+	public double angleTransform(double angle) {
+		if (angle >= Math.PI) {
+			angle -= Math.PI;
+		}
+		return angle;
+	}
+
+	/*
+	 * 0/3. step: a bifurcation in a spur could be real bifurcation
+	 */
 	public void changeType() throws IOException {
+		Mat out = this.ridge.getMatrix().clone();
+		for (Map.Entry<Minutiae, Ridges> bifRidge : ridge.getMinutiaeMapFinal().entrySet()) {
+			for (Map.Entry<Minutiae, Ridges> termRidge : ridge.getMinutiaeMapFinal().entrySet()) {
+				if (bifRidge.getKey().getType().equals("bifurcation") && termRidge.getKey().getType().equals("ending")
+						&& distanceEuclidean(bifRidge.getKey().getLocation(), termRidge.getKey().getLocation()) < 6) {
+					for (Map.Entry<Minutiae, Ridges> termIntRidge : ridge.getMinutiaeMapFinal().entrySet()) {
+						double sessionAngle = orientation(pointToCell(termRidge.getKey().getLocation()),
+								pointToCell(termIntRidge.getKey().getLocation()));
+						sessionAngle = orientationForFullAngle(sessionAngle);
+						double diffAngle = Math.abs(termIntRidge.getValue().angleTerm - sessionAngle);
+						if (!termRidge.getKey().equals(termIntRidge.getKey())
+								&& termIntRidge.getKey().getType().equals("ending")
+								&& distanceEuclidean(termRidge.getKey().getLocation(),
+										termIntRidge.getKey().getLocation()) < 12
+								&& diffAngle <= Math.toRadians(15)) {
+							for (Map.Entry<Minutiae, Ridges> bifValley : valley.getMinutiaeMapFinal().entrySet()) {
+								if (bifValley.getKey().getType().equals("bifurcation")) {
+									double dist = minDistDotLine(termRidge.getKey().getLocation(),
+											termIntRidge.getKey().getLocation(), bifValley.getKey().getLocation());
+									if (dist <= 0.7) {
+										// típust vált: term -> bif, átállítjuk az adatait is, ne legyen nullpointer ex.
+										termRidge.getKey().setType("bifurcation");
+										termRidge.getValue().setAngleBif(bifValley.getKey().getOrientation());
+										termRidge.getValue().setBifurcations(bifValley.getValue().getBifurcations());
+										Imgproc.circle(out, termRidge.getKey().getLocation(), 4, purple);
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		//resizeAndShow(out, "change type term -> bif");
+	}
+	
+	public void changeTypeInverse() throws IOException {
 		Mat out = this.ridge.getMatrix().clone();
 		for (Map.Entry<Minutiae, Ridges> bifValley : valley.getMinutiaeMapFinal().entrySet()) {
 			for (Map.Entry<Minutiae, Ridges> termValley : valley.getMinutiaeMapFinal().entrySet()) {
@@ -188,14 +307,15 @@ public class Extraction {
 				}
 			}
 		}
-		//resizeAndShow(out, "Típust váltó 1. (elágazás->végzõdés)");
+		//resizeAndShow(out, "change type bif->term");
 	}
 
 	public void changeType2() throws IOException {
 		Mat out = this.ridge.getMatrix().clone();
 		for (Map.Entry<Minutiae, Ridges> bifRidge : ridge.getMinutiaeMapFinal().entrySet()) {
 			for (Map.Entry<Minutiae, Ridges> bifValley : valley.getMinutiaeMapFinal().entrySet()) {
-				if (bifRidge.getKey().getType().equals("bifurcation") && bifValley.getKey().getType().equals("bifurcation")
+				if (bifRidge.getKey().getType().equals("bifurcation")
+						&& bifValley.getKey().getType().equals("bifurcation")
 						&& distanceEuclidean(bifRidge.getKey().getLocation(), bifValley.getKey().getLocation()) <= 4) {
 					double angle = calculateBifurcationAngle(bifValley.getValue());
 					bifRidge.getKey().setType("ending");
@@ -206,105 +326,41 @@ public class Extraction {
 				}
 			}
 		}
-		//resizeAndShow(out, "Típust váltó 2. (elágazás->végzõdés)");
+		//resizeAndShow(out, "change type 2, bif->term");
 	}
 
 	public double calculateBifurcationAngle(Ridges ridge) {
-				Object[] array = ridge.anglesBif.toArray();
-				double alpha = (double) array[0];
-				double beta = (double) array[1];
-				double gamma = (double) array[2];
-				double distGammaAlpha = (2 * Math.PI - gamma) + alpha;
-				double distBetaAlpha = beta - alpha;
-				double distGammaBeta = gamma - beta;
-				double minDistance = minElement(distGammaAlpha, distBetaAlpha, distGammaBeta);
-				double half = minDistance / 2;
-				double angle = 0;
-				if (minDistance == distGammaAlpha) {
-					angle = alpha - half;
-					if (angle < 0) {
-						angle = 2 * Math.PI + angle;
-					}
-				} else if (minDistance == distBetaAlpha)
-					angle = alpha + half;
-				else if (minDistance == distGammaBeta)
-					angle = beta + half;
-				return angle;
+		Object[] array = ridge.anglesBif.toArray();
+		double alpha = (double) array[0];
+		double beta = (double) array[1];
+		double gamma = (double) array[2];
+		double distGammaAlpha = (2 * Math.PI - gamma) + alpha;
+		double distBetaAlpha = beta - alpha;
+		double distGammaBeta = gamma - beta;
+		double minDistance = minElement(distGammaAlpha, distBetaAlpha, distGammaBeta);
+		double half = minDistance / 2;
+		double angle = 0;
+		if (minDistance == distGammaAlpha) {
+			angle = alpha - half;
+			if (angle < 0) {
+				angle = 2 * Math.PI + angle;
+			}
+		} else if (minDistance == distBetaAlpha)
+			angle = alpha + half;
+		else if (minDistance == distGammaBeta)
+			angle = beta + half;
+		return angle;
 	}
-	
+
 	public double minElement(double a, double b, double c) {
 		return Math.min(a, Math.min(b, c));
 	}
 
-	// 4. lépés: túl közel lévõ termek
-	public void eliminationTooNearTerm() throws IOException {
-		Mat out = this.ridge.getMatrix().clone();
-		Set<Minutiae> section = new HashSet<>();
-		for (Minutiae termExt : ridge.getMinutiaeMapFinal().keySet()) {
-			for (Minutiae termInt : ridge.getMinutiaeMapFinal().keySet()) {
-				if (termExt.getType().equals("ending") && termInt.getType().equals("ending")
-						&& !termExt.getLocation().equals(termInt.getLocation())
-						&& distanceEuclidean(termExt.getLocation(), termInt.getLocation()) <= 5) {
-					section.add(termExt);
-					section.add(termInt);
-					Imgproc.circle(out, termExt.getLocation(), 3, red);
-					Imgproc.circle(out, termInt.getLocation(), 3, red);
-				}
-
-			}
-		}
-		for (Minutiae m : section) {
-			ridge.removeRecord(m);
-		}
-		//resizeAndShow(out, "Túl közeli termek");
-	}
-
-	// 5. lépés: redõszakadások eltávolítása
-	public void eliminationGap() throws IOException {
-		Mat out = ridge.getMatrix().clone();
-		Set<Minutiae> section = new HashSet<>();
-		// minutiaeListRidge.removeAll(hpointsValley);????
-		double low = Math.toRadians(0);
-		double high = Math.toRadians(15);
-		for (Map.Entry<Minutiae, Ridges> minExt : this.ridge.getMinutiaeMapFinal().entrySet()) {
-			for (Map.Entry<Minutiae, Ridges> minInt : this.ridge.getMinutiaeMapFinal().entrySet()) {
-				if (minExt.getKey().getType().equals("ending") && minInt.getKey().getType().equals("ending")
-						&& distanceEuclidean(minExt.getKey().getLocation(), minInt.getKey().getLocation()) < 12
-						&& distanceEuclidean(minExt.getKey().getLocation(), minInt.getKey().getLocation()) != 0) {
-					double sessionAngle = orientation(pointToCell(minExt.getKey().getLocation()),
-							pointToCell(minInt.getKey().getLocation()));
-					sessionAngle = angleTransform(sessionAngle);
-					double minExtAngle = angleTransform(minExt.getKey().getOrientation());
-					double minIntAngle = angleTransform(minInt.getKey().getOrientation());
-					boolean contain = false;
-					for (Cell c : minExt.getValue().terminations) {
-						if (minInt.getValue().terminations.contains(c))
-							contain = true;
-					}
-					if (((Math.abs(minExtAngle - sessionAngle) < high) || (Math.abs(minIntAngle - sessionAngle) < high))
-							&& Math.abs(minExtAngle - minIntAngle) < high || contain) {
-						section.add(minExt.getKey());
-						section.add(minInt.getKey());
-						Imgproc.circle(out, minExt.getKey().getLocation(), 4, new Scalar(0, 0, 255));
-						Imgproc.circle(out, minInt.getKey().getLocation(), 4, new Scalar(0, 0, 255));
-					}
-				}
-			}
-		}
-		for (Minutiae m : section) {
-			ridge.removeRecord(m);
-		}
-		//resizeAndShow(out, "Redõ szakadások");
-	}
-
-	public double angleTransform(double angle) {
-		if (angle >= Math.PI) {
-			angle -= Math.PI;
-		}
-		return angle;
-	}
-
-	// 6. lépés: valódi nyúlványok eltávolítása (elágazáshoz túl közeli végzõdés)
+	/*
+	 * 2. step: spur elimination if in ridge the distance between a bifurcation and
+	 * a termination < threshold = 20 AND they are connected each other -> spur must
+	 * be eliminated
+	 */
 	public void eliminationSpur() throws IOException {
 		Mat out = ridge.getMatrix().clone();
 		Set<Minutiae> section = new HashSet<>();
@@ -332,10 +388,15 @@ public class Extraction {
 		for (Minutiae m : section) {
 			ridge.removeRecord(m);
 		}
-		//resizeAndShow(out, "spur elimination");
+		// resizeAndShow(out, "spur elimination");
 	}
 
-	// 7. lépés: H-pontok felderítése és eltávolítása
+	/*
+	 * 3. step: H-points detection and elimination: - 2 line sessions are
+	 * intersected (1: in ridge bif-bif, 2: in valley term-term) - the distance
+	 * between midpoint of session bb and midpoint of session tt < 6 - 25 >= angle
+	 * of intersection <= 155
+	 */
 	public void eliminationHpoint() throws IOException {
 		Mat out = ridge.getMatrix().clone();
 		Set<Minutiae> section = new HashSet<>();
@@ -343,16 +404,16 @@ public class Extraction {
 			for (Map.Entry<Minutiae, Ridges> bifMinInt : ridge.getMinutiaeMapFinal().entrySet()) {
 				if (bifMinExt.getKey().getType().equals("bifurcation")
 						&& bifMinInt.getKey().getType().equals("bifurcation")
-						&& distanceEuclidean(bifMinExt.getKey().getLocation(), bifMinInt.getKey().getLocation()) < 20
+						&& distanceEuclidean(bifMinExt.getKey().getLocation(), bifMinInt.getKey().getLocation()) <= 12
 						&& distanceEuclidean(bifMinExt.getKey().getLocation(), bifMinInt.getKey().getLocation()) != 0) {
 					for (Map.Entry<Minutiae, Ridges> termMin1 : valley.getMinutiaeMapFinal().entrySet()) {
 						for (Map.Entry<Minutiae, Ridges> termMin2 : valley.getMinutiaeMapFinal().entrySet()) {
 							if (termMin1.getKey().getType().equals("ending")
 									&& termMin2.getKey().getType().equals("ending")
 									&& distanceEuclidean(termMin1.getKey().getLocation(),
-											bifMinExt.getKey().getLocation()) <= 8
+											bifMinExt.getKey().getLocation()) <= 5
 									&& distanceEuclidean(termMin2.getKey().getLocation(),
-											bifMinExt.getKey().getLocation()) <= 8
+											bifMinInt.getKey().getLocation()) <= 5
 									&& !termMin1.getKey().getLocation().equals(termMin2.getKey().getLocation())) {
 								if (sessionsIntersect(bifMinExt.getKey().getLocation(),
 										bifMinInt.getKey().getLocation(), termMin1.getKey().getLocation(),
@@ -385,13 +446,123 @@ public class Extraction {
 				}
 			}
 		}
+//		// dual
+//		for (Map.Entry<Minutiae, Ridges> bifMinExt : valley.getMinutiaeMapFinal().entrySet()) {
+//			for (Map.Entry<Minutiae, Ridges> bifMinInt : valley.getMinutiaeMapFinal().entrySet()) {
+//				if (bifMinExt.getKey().getType().equals("bifurcation")
+//						&& bifMinInt.getKey().getType().equals("bifurcation")
+//						&& distanceEuclidean(bifMinExt.getKey().getLocation(), bifMinInt.getKey().getLocation()) < 12
+//						&& distanceEuclidean(bifMinExt.getKey().getLocation(), bifMinInt.getKey().getLocation()) != 0) {
+//					for (Map.Entry<Minutiae, Ridges> termMin1 : ridge.getMinutiaeMapFinal().entrySet()) {
+//						for (Map.Entry<Minutiae, Ridges> termMin2 : ridge.getMinutiaeMapFinal().entrySet()) {
+//							if (termMin1.getKey().getType().equals("ending")
+//									&& termMin2.getKey().getType().equals("ending")
+//									&& distanceEuclidean(termMin1.getKey().getLocation(),
+//											bifMinExt.getKey().getLocation()) <= 6
+//									&& distanceEuclidean(termMin2.getKey().getLocation(),
+//											bifMinExt.getKey().getLocation()) <= 6
+//									&& !termMin1.getKey().getLocation().equals(termMin2.getKey().getLocation())) {
+//								if (sessionsIntersect(bifMinExt.getKey().getLocation(),
+//										bifMinInt.getKey().getLocation(), termMin1.getKey().getLocation(),
+//										termMin2.getKey().getLocation())) {
+//									Point midPointRidge = midPoint(bifMinExt.getKey().getLocation(),
+//											bifMinInt.getKey().getLocation());
+//									Point midPointValley = midPoint(termMin1.getKey().getLocation(),
+//											termMin2.getKey().getLocation());
+//									double distanceMidPoint = distanceEuclidean(midPointRidge, midPointValley);
+//									if (distanceMidPoint < 6) {
+//										double angleIntersect = Math.toDegrees(angleOfIntersectPoint(
+//												bifMinExt.getKey().getLocation(), bifMinInt.getKey().getLocation(),
+//												termMin1.getKey().getLocation(), termMin2.getKey().getLocation())); // radiánba
+//										// 0-180-ig
+//										if (angleIntersect >= 25 && angleIntersect <= 155) {
+//											section.add(bifMinExt.getKey());
+//											section.add(bifMinInt.getKey());
+//											section.add(termMin1.getKey());
+//											section.add(termMin2.getKey());
+//											Imgproc.circle(out, bifMinExt.getKey().getLocation(), 3, red);
+//											Imgproc.circle(out, bifMinInt.getKey().getLocation(), 3, red);
+//											Imgproc.circle(out, termMin1.getKey().getLocation(), 3, blue);
+//											Imgproc.circle(out, termMin2.getKey().getLocation(), 3, blue);
+//										}
+//									}
+//								}
+//							}
+//						}
+//					}
+//				}
+//			}
+//		}
+
 		for (Minutiae m : section) {
 			ridge.removeRecord(m);
 		}
 		//resizeAndShow(out, "H-pontok eltávolítása");
 	}
 
-	// 8. lépés: perem minuciák eltávolítása (term és bif is)
+	/*
+	 * 4/1. step: too near minutiae
+	 */
+	public void eliminationTooNearMinutiae() throws IOException {
+		Mat out = this.ridge.getMatrix().clone();
+		Set<Minutiae> section = new HashSet<>();
+		for (Minutiae minExt : ridge.getMinutiaeMapFinal().keySet()) {
+			for (Minutiae minInt : ridge.getMinutiaeMapFinal().keySet()) {
+				if (!minExt.getLocation().equals(minInt.getLocation())
+						&& distanceEuclidean(minExt.getLocation(), minInt.getLocation()) <= 8) {
+					section.add(minExt);
+					section.add(minInt);
+					Imgproc.circle(out, minExt.getLocation(), 3, red);
+					Imgproc.circle(out, minInt.getLocation(), 3, red);
+				}
+
+			}
+		}
+		for (Minutiae m : section) {
+			ridge.removeRecord(m);
+		}
+		//resizeAndShow(out, "Too near minutiae");
+	}
+
+	/*
+	 * 4/2. step: if a minutia has more than one minutia corresponding in dual
+	 * skeleton
+	 */
+
+	public void notRealMinutiae() {
+		Set<Minutiae> section = new HashSet<>();
+		for (Map.Entry<Minutiae, Ridges> bifMin : ridge.getMinutiaeMapFinal().entrySet()) {
+			HashSet<Minutiae> set = new HashSet<>();
+			for (Map.Entry<Minutiae, Ridges> termMin : valley.getMinutiaeMapFinal().entrySet()) {
+				if (bifMin.getKey().getType().equals("bifurcation") && termMin.getKey().getType().equals("ending")
+						&& distanceEuclidean(termMin.getKey().getLocation(), bifMin.getKey().getLocation()) <= 5) {
+					set.add(termMin.getKey());
+				}
+			}
+			if (set.size() != 1 && bifMin.getKey().getType().equals("bifurcation")) {
+				section.add(bifMin.getKey());
+			}
+		}
+		for (Map.Entry<Minutiae, Ridges> termMin : ridge.getMinutiaeMapFinal().entrySet()) {
+			HashSet<Minutiae> set = new HashSet<>();
+			for (Map.Entry<Minutiae, Ridges> bifMin : valley.getMinutiaeMapFinal().entrySet()) {
+				if (bifMin.getKey().getType().equals("bifurcation") && termMin.getKey().getType().equals("ending")
+						&& distanceEuclidean(termMin.getKey().getLocation(), bifMin.getKey().getLocation()) <= 5) {
+					set.add(bifMin.getKey());
+				}
+			}
+			if (set.size() != 1 && termMin.getKey().getType().equals("ending")) {
+				section.add(termMin.getKey());
+			}
+		}
+		for (Minutiae m : section) {
+			ridge.removeRecord(m);
+		}
+	}
+
+	/*
+	 * 5. step: minutiae's elimination if are too near to border
+	 */
 	public void borderMask(Mat mask) throws IOException {
 		Mat out = ridge.getMatrix().clone();
 		Set<Minutiae> section = new HashSet<>();
@@ -409,11 +580,13 @@ public class Extraction {
 		for (Minutiae m : section) {
 			ridge.removeRecord(m);
 		}
-		//resizeAndShow(out, "Perem menti minuciák eltávolítása");
+		// resizeAndShow(out, "border minutiae");
 	}
 
-	/**to static variable allContour calculates new contour that 
-	 * the convex border of non zero points of image 
+	/**
+	 * to static variable allContour calculates new contour that the convex border
+	 * of non zero points of image
+	 * 
 	 * @param input: thinned ridge image
 	 * @return: Mat object that would be the mask for segmentation of valley image
 	 */
@@ -448,7 +621,9 @@ public class Extraction {
 		return drawing;
 	}
 
-	/**scales the mask size to mark the border area of ROI
+	/**
+	 * scales the mask size to mark the border area of ROI
+	 * 
 	 * @param mask
 	 * @param scale
 	 * @param input
@@ -474,9 +649,10 @@ public class Extraction {
 		Imgproc.fillConvexPoly(out, outList, Scalar.all(0));
 		return out;
 	}
-	
-	/**make inverse of mask
-	 * black -> background, white -> ROI
+
+	/**
+	 * make inverse of mask black -> background, white -> ROI
+	 * 
 	 * @param input
 	 * @param mask
 	 * @return
@@ -495,8 +671,6 @@ public class Extraction {
 		}
 		return out;
 	}
-
-	
 
 	public double minDistDotLine(Point a, Point b, Point d) {
 		Point ab = new Point();
@@ -535,7 +709,7 @@ public class Extraction {
 	 * functions auxiliar of H points elmination
 	 * 
 	 **********************/
-	// ha pr egy szakasz, megadja, hogy q pont a szakaszon van e
+	// pr the line section, is q in the line session?
 	public boolean onSegment(Point p, Point q, Point r) {
 		if (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && q.y <= Math.max(p.y, r.y)
 				&& q.y >= Math.min(p.y, r.y))
@@ -546,8 +720,8 @@ public class Extraction {
 	public int orientationSegment(Point p, Point q, Point r) {
 		double val = (q.y - p.y) * (r.x - q.x) - (q.x - p.x) * (r.y - q.y);
 		if (val == 0)
-			return 0; // colinear
-		return (val > 0) ? 1 : 2; // clock or counterclock wise
+			return 0; 
+		return (val > 0) ? 1 : 2; 
 	}
 
 	public boolean sessionsIntersect(Point p1, Point p2, Point q1, Point q2) {
@@ -557,17 +731,12 @@ public class Extraction {
 		int o4 = orientationSegment(q1, q2, p2);
 		if (o1 != o2 && o3 != o4)
 			return true;
-		// Special Cases
-		// p1, q1 and p2 are colinear and p2 lies on segment p1q1
 		if (o1 == 0 && onSegment(p1, p2, q1))
 			return true;
-		// p1, q1 and q2 are colinear and q2 lies on segment p1q1
 		if (o2 == 0 && onSegment(p1, q2, q1))
 			return true;
-		// p2, q2 and p1 are colinear and p1 lies on segment p2q2
 		if (o3 == 0 && onSegment(p2, p1, q2))
 			return true;
-		// p2, q2 and q1 are colinear and q1 lies on segment p2q2
 		if (o4 == 0 && onSegment(p2, q1, q2))
 			return true;
 		return false;
@@ -615,8 +784,6 @@ public class Extraction {
 		return out;
 	}
 
-	// a minucia pont egy cella, ezért onnan kiindulva, megadom a
-	// bifurcation 3 legtávolabbi pontjait
 	public double orientationVector(Cell cell1, Cell cell2) {
 		double x = cell2.x - cell1.x;
 		double y = cell2.y - cell1.y;
@@ -626,7 +793,7 @@ public class Extraction {
 	/************
 	 * 7. all potential minutiaes detection
 	 * 
-	 * keresztszámos módszerrel, ha CN==1 -> végzõdés, ha CN==3 -> elágazás
+	 * crossing number if  CN==1 -> term, ha CN==3 -> bif
 	 ***********/
 	// Minutiae List for 2 types of minutiae (bifurcation, termination)
 	public Set<Minutiae> minutiaeList(double[][] array) {
@@ -671,7 +838,6 @@ public class Extraction {
 		return out;
 	}
 
-	// segédfüggvény: kiszámítja a redõk közötti átlagos távolságot
 	public double avgRidgeDistance(Mat input) {
 		double sum = 0;
 		double distance = 0;
@@ -693,10 +859,7 @@ public class Extraction {
 		return distance;
 	}
 
-	// show termination - bifurcation orientation in Mat obj.
-	// szögek tárolása PI radiánban 0-6.28 a Minutiae osztály egyik adattagjaként
-	// kirajzoláshoz ezt át kell váltani elõbb fokba, majd orientationToDraw
-	// fgv-nyel
+		// angles in radians
 	public Mat drawMinutiaeDirectionWithLabel() {
 		Mat out = this.ridge.getMatrix().clone();
 		Scalar termColor = new Scalar(190, 30, 190); // lila
@@ -745,21 +908,22 @@ public class Extraction {
 			if (minutiae.getKey().getType().equals("bifurcation")) {
 				Point p1 = minutiae.getKey().getLocation();
 				double angle = orientationForFullAngle(minutiae.getKey().getOrientation());
-				Point p2 = angle(Math.toDegrees(angle), p1, avgRidgeDistance);
-				Imgproc.circle(out, minutiae.getKey().getLocation(), 2, bifColor, 1);// BGR - green
-				Imgproc.line(out, p1, p2, bifColor, 1);
+				Point p2 = angle(Math.toDegrees(angle), p1, 8);
+				Point a = new Point(minutiae.getKey().getLocation().x - 3, minutiae.getKey().getLocation().y - 3);
+				Point b = new Point(minutiae.getKey().getLocation().x + 3, minutiae.getKey().getLocation().y + 3);
+				Imgproc.rectangle(out, a, b, blue, 1);// BGR - green
+				Imgproc.line(out, p1, p2, blue, 2);
 			} else {
 				Point p1 = minutiae.getKey().getLocation();
 				double angle = orientationForFullAngle(minutiae.getKey().getOrientation());
-				Point p2 = angle(Math.toDegrees(angle), p1, avgRidgeDistance);
-				Imgproc.circle(out, minutiae.getKey().getLocation(), 2, termColor, 1);// BGR - purple
-				Imgproc.line(out, p1, p2, termColor, 1);
+				Point p2 = angle(Math.toDegrees(angle), p1, 8);
+				Imgproc.circle(out, minutiae.getKey().getLocation(), 4, termColor, 1);// BGR - purple
+				Imgproc.line(out, p1, p2, termColor, 2);
 			}
 		}
 		return out;
 	}
 
-	// vékonyított redõvonal és barázdavonal kép összemergelése - szemléltetéshez
 	public Mat combinatedRidgeValleyFromThinned(Mat ridge, Mat valley) {
 		Mat out = new Mat(ridge.size(), ridge.type());
 		for (int i = 0; i < height; i++) {

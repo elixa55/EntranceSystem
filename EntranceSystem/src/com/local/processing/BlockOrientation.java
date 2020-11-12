@@ -259,7 +259,7 @@ public class BlockOrientation {
 	 * declare the mask as well
 	 ************/
 
-	/**decides weather a block in ROI (false) or in background (true)
+	/**decides whether a block in ROI (false) or in background (true)
 	 * not absolutly in base of variance of given block
 	 * but majority of pixels (histogram)
 	 * and variance must be in white region -> background
@@ -375,13 +375,6 @@ public class BlockOrientation {
 		this.mask = outMask;
 	}
 
-	
-
-	
-
-	
-	
-
 	/*********************************************
 	 * calculate orientation and filter - 1. version
 	 * @throws IOException 
@@ -407,11 +400,11 @@ public class BlockOrientation {
 	}
 		public Mat gaborFilter(Mat input, double theta) throws IOException {
 			// theta - orientation of the normal to the parallel stripes
-			int kernel_s = 11; // size of gabor filter (21)
-			double sigma = 2; // standard deviation of the gaussian function (8)
-			double lambda = 6; // wavelength of the sinusoidal factor (8)
-			double gamma = 3.5; // spatial aspect ratio (0.5)
-			double psi = 0; // phase offset (0)
+			int kernel_s = 11; // size of gabor filter
+			double sigma = 2; // standard deviation of the gaussian function 
+			double lambda = 6; // wavelength of the sinusoidal factor 
+			double gamma = 3.5; // spatial aspect ratio 
+			double psi = 0; // phase offset 
 			Mat g_kernel = Imgproc.getGaborKernel(new Size(kernel_s, kernel_s), sigma, theta, lambda, gamma, psi,
 					CvType.CV_32F);
 			Mat destination = new Mat();
@@ -425,11 +418,11 @@ public class BlockOrientation {
 	
 	 /***************************
 	 * 5/a. step: calculation orientation
-	 * least squares method (Hong: pixel-wise algorithm) 
+	 * least squares method (Hong)
+	 * blockSigma = 7, orientSmoothSigma = 7 
 	 *  *************************/
 	public void ridgeOrientation(Mat ridgeSegment, Mat result, int gradientSigma, int blockSigma,
 			int orientSmoothSigma) {
-
 		int rows = ridgeSegment.rows();
 		int cols = ridgeSegment.cols();
 		int kSize = Math.round(6 * gradientSigma);
@@ -437,51 +430,54 @@ public class BlockOrientation {
 			kSize++;
 		}
 		Mat kernel = getGaussianKernel(kSize, gradientSigma);
+		Mat sobel_x = new Mat(1, 3, CvType.CV_32FC1);
+		Mat sobel_y = new Mat(3, 1, CvType.CV_32FC1);
+		Imgproc.Sobel(kernel, sobel_x, CvType.CV_32F, 1, 0);
+		Imgproc.Sobel(kernel, sobel_y, CvType.CV_32F, 0, 1);
 
-		Mat fXKernel = new Mat(1, 3, CvType.CV_32FC1);
-		Mat fYKernel = new Mat(3, 1, CvType.CV_32FC1);
-		fXKernel.put(0, 0, -1);
-		fXKernel.put(0, 1, 0);
-		fXKernel.put(0, 2, 1);
-		fYKernel.put(0, 0, -1);
-		fYKernel.put(1, 0, 0);
-		fYKernel.put(2, 0, 1);
-		Mat fX = new Mat(kSize, kSize, CvType.CV_32FC1);
-		Mat fY = new Mat(kSize, kSize, CvType.CV_32FC1);
-		Imgproc.filter2D(kernel, fX, CvType.CV_32FC1, fXKernel);
-		Imgproc.filter2D(kernel, fY, CvType.CV_32FC1, fYKernel);
-		Mat gX = new Mat(rows, cols, CvType.CV_32FC1);
-		Mat gY = new Mat(rows, cols, CvType.CV_32FC1);
-		Imgproc.filter2D(ridgeSegment, gX, CvType.CV_32FC1, fX);
-		Imgproc.filter2D(ridgeSegment, gY, CvType.CV_32FC1, fY);
-		Mat gXX = new Mat(rows, cols, CvType.CV_32FC1);
-		Mat gXY = new Mat(rows, cols, CvType.CV_32FC1);
-		Mat gYY = new Mat(rows, cols, CvType.CV_32FC1);
-		Core.multiply(gX, gX, gXX);
-		Core.multiply(gX, gY, gXY);
-		Core.multiply(gY, gY, gYY);
+		// vx = 2 * g_x * g_y, vy = g_x^2 - g_y^2
+		// theta = 0.5 * arctan(vy / vx) - adott i,j pixelkˆzÈppont˙ blokk 
+		Mat f_x = new Mat(kSize, kSize, CvType.CV_32FC1);
+		Mat f_y = new Mat(kSize, kSize, CvType.CV_32FC1);
+		Imgproc.filter2D(kernel, f_x, CvType.CV_32FC1, sobel_x);
+		Imgproc.filter2D(kernel, f_y, CvType.CV_32FC1, sobel_y);
+		Mat g_x = new Mat(rows, cols, CvType.CV_32FC1);
+		Mat g_y = new Mat(rows, cols, CvType.CV_32FC1);
+		Imgproc.filter2D(ridgeSegment, g_x, CvType.CV_32FC1, f_x);
+		Imgproc.filter2D(ridgeSegment, g_y, CvType.CV_32FC1, f_y);
+		// square of the gradients
+		Mat g_x_square = new Mat(rows, cols, CvType.CV_32FC1);
+		Mat g_xy = new Mat(rows, cols, CvType.CV_32FC1);
+		Mat g_y_square = new Mat(rows, cols, CvType.CV_32FC1);
+		Mat vx = new Mat(rows, cols, CvType.CV_32FC1);
+		Mat vy = new Mat(rows, cols, CvType.CV_32FC1);
+		Core.multiply(g_x, g_x, g_x_square);
+		Core.multiply(g_y, g_y, g_y_square);
+		Core.multiply(g_x, g_y, g_xy);
 		kSize = Math.round(6 * blockSigma);
 		if (kSize % 2 == 0) {
 			kSize++;
 		}
 		kernel = getGaussianKernel(kSize, blockSigma);
-		Imgproc.filter2D(gXX, gXX, CvType.CV_32FC1, kernel);
-		Imgproc.filter2D(gYY, gYY, CvType.CV_32FC1, kernel);
-		Imgproc.filter2D(gXY, gXY, CvType.CV_32FC1, kernel);
-		Core.multiply(gXY, Scalar.all(2), gXY);
+		Imgproc.filter2D(g_x_square, g_x_square, CvType.CV_32FC1, kernel);
+		Imgproc.filter2D(g_y_square, g_y_square, CvType.CV_32FC1, kernel);
+		Imgproc.filter2D(g_xy, g_xy, CvType.CV_32FC1, kernel);
+		Core.multiply(g_xy, Scalar.all(2), vx);
 		Mat denom = new Mat(rows, cols, CvType.CV_32FC1);
-		Mat gXXMiusgYY = new Mat(rows, cols, CvType.CV_32FC1);
-		Mat gXXMiusgYYSquared = new Mat(rows, cols, CvType.CV_32FC1);
-		Mat gXYSquared = new Mat(rows, cols, CvType.CV_32FC1);
-		Core.subtract(gXX, gYY, gXXMiusgYY);
-		Core.multiply(gXXMiusgYY, gXXMiusgYY, gXXMiusgYYSquared);
-		Core.multiply(gXY, gXY, gXYSquared);
-		Core.add(gXXMiusgYYSquared, gXYSquared, denom);
+		Mat vx_square = new Mat(rows, cols, CvType.CV_32FC1);
+		Mat vy_square = new Mat(rows, cols, CvType.CV_32FC1);
+		Core.subtract(g_x_square, g_y_square, vy);
+		
+		// phi_x = cos(2 * theta), phi_y = sin(2*theta)
+		Core.multiply(vx, vx, vx_square);
+		Core.multiply(vy, vy, vy_square);
+		Core.add(vx_square, vy_square, denom);
 		Core.sqrt(denom, denom);
 		Mat sin2Theta = new Mat(rows, cols, CvType.CV_32FC1);
 		Mat cos2Theta = new Mat(rows, cols, CvType.CV_32FC1);
-		Core.divide(gXY, denom, sin2Theta);
-		Core.divide(gXXMiusgYY, denom, cos2Theta);
+		Core.divide(vx, denom, sin2Theta);
+		Core.divide(vy, denom, cos2Theta);
+		// low-pass filter
 		kSize = Math.round(6 * orientSmoothSigma);
 		if (kSize % 2 == 0) {
 			kSize++;
@@ -494,89 +490,6 @@ public class BlockOrientation {
 		this.orientation = result;
 	}
 	
-	/**********************************
-	 * 5/b. step: calculation orientation
-	 * least squares method (Hong: pixel-wise algorithm) 
-	 *  *************************/
-	/** orientation of each pixel -> to class variable Mat this.orientation
-	 * @param input
-	 * @param gradientSigma
-	 * @param blockSigma
-	 * @param orientSmoothSigma
-	 */
-	public void computeOrientation(Mat input, int gradientSigma, int blockSigma, int orientSmoothSigma) {
-		Mat out = new Mat(height, width, CvType.CV_32FC1);
-		// 1. calculation of gradients
-		int kernel_size = Math.round(6 * gradientSigma);
-		if (kernel_size % 2 == 0) {
-			kernel_size++;
-		}
-		Mat GaussKernel1 = getGaussianKernel(kernel_size, gradientSigma);
-		Mat sobel_x = new Mat(1, 3, CvType.CV_32FC1);
-		Mat sobel_y = new Mat(3, 1, CvType.CV_32FC1);
-		Imgproc.Sobel(GaussKernel1, sobel_x, CvType.CV_32F, 1, 0);
-		Imgproc.Sobel(GaussKernel1, sobel_y, CvType.CV_32F, 0, 1);
-		Mat kernel_x = new Mat(kernel_size, kernel_size, CvType.CV_32FC1);
-		Mat kernel_y = new Mat(kernel_size, kernel_size, CvType.CV_32FC1);
-		Imgproc.filter2D(GaussKernel1, kernel_x, CvType.CV_32FC1, sobel_x);
-		Imgproc.filter2D(GaussKernel1, kernel_y, CvType.CV_32FC1, sobel_y);
-		Mat lambda_x = new Mat(height, width, CvType.CV_32FC1);
-		Mat lambda_y = new Mat(height, width, CvType.CV_32FC1);
-		Imgproc.filter2D(input, lambda_x, CvType.CV_32FC1, kernel_x);
-		Imgproc.filter2D(input, lambda_y, CvType.CV_32FC1, kernel_y);
-		// 2. A pixel lok·lis ir·nya (sum):
-		// vx = 2 * lambda_x * lambda_y, vy = lambda_x^2 - lambda_y^2
-		// theta = 0.5 * arctan(vy / vx) - adott i,j pixelkˆzÈppont˙ blokk 
-		// lok·lis ir·ny·nak legkisebb nÈgyzetek mÛdszerÈvel becs¸lt ÈrtÈke
-		kernel_size = Math.round(6 * blockSigma);
-		if (kernel_size % 2 == 0) {
-			kernel_size++;
-		}
-		Mat GaussKernel2 = getGaussianKernel(kernel_size, blockSigma);
-		Mat lambda_x_square = new Mat(height, width, CvType.CV_32FC1);
-		Mat lambda_y_square = new Mat(height, width, CvType.CV_32FC1);
-		Mat vx = new Mat(height, width, CvType.CV_32FC1);
-		Core.multiply(lambda_x, lambda_x, lambda_x_square);
-		Core.multiply(lambda_x, lambda_y, vx);
-		Core.multiply(lambda_y, lambda_y, lambda_y_square);
-		Imgproc.filter2D(lambda_x_square, lambda_x_square, CvType.CV_32FC1, GaussKernel2);
-		Imgproc.filter2D(lambda_y_square, lambda_y_square, CvType.CV_32FC1, GaussKernel2);
-		Imgproc.filter2D(vx, vx, CvType.CV_32FC1, GaussKernel2);
-		// nominator
-		Scalar duplex = Scalar.all(2);
-		Core.multiply(vx, duplex, vx);
-		// denominator
-		Mat diagonal = new Mat(height, width, CvType.CV_32FC1);
-		Mat vy = new Mat(height, width, CvType.CV_32FC1);
-		Mat vx_square = new Mat(height, width, CvType.CV_32FC1);
-		Mat vy_square = new Mat(height, width, CvType.CV_32FC1);
-		Core.subtract(lambda_x_square, lambda_y_square, vy);
-		// v = Math.sqrt(vx^2 + vy^2)
-		// vx(phi_x) = v * sin(2* theta)	vy(phi_y) = v * cos(2 * theta)
-		Core.multiply(vx, vx, vx_square);
-		Core.multiply(vy, vy, vy_square);
-		Core.add(vx_square, vy_square, diagonal);
-		Core.sqrt(diagonal, diagonal);
-		Mat cos2Theta = new Mat(height, width, CvType.CV_32FC1);
-		Mat sin2Theta = new Mat(height, width, CvType.CV_32FC1);
-		Core.divide(vy, diagonal, cos2Theta);
-		Core.divide(vx, diagonal, sin2Theta);
-		// 3. smoothing by low pass Gauss filter
-		kernel_size = Math.round(6 * orientSmoothSigma);
-		if (kernel_size % 2 == 0) {
-			kernel_size++;
-		}
-		Mat GaussKernel3 = getGaussianKernel(kernel_size, orientSmoothSigma);
-		Imgproc.filter2D(sin2Theta, sin2Theta, CvType.CV_32FC1, GaussKernel3);
-		Imgproc.filter2D(cos2Theta, cos2Theta, CvType.CV_32FC1, GaussKernel3);
-
-		// matrix element' values in range [0,PI]
-		atan2(sin2Theta, cos2Theta, out); 
-		Core.multiply(out, Scalar.all(Math.PI / 360.0), out);
-		String szogek = dump(out);
-		writeFile("szogek.txt", szogek);
-		this.orientation = out;
-	}
 
 	/**Gauss kernel: by x and y components matrix executes real matrix multiply
 	 * @param kernel_size
@@ -607,6 +520,8 @@ public class BlockOrientation {
 
 	/**********************************
 	 * 6. step: calculation frequency
+	 * blockSize = 38
+	 * windowSize = 5
 	 *************************/
 	public double ridgeFrequency(Mat input, Mat mask, Mat orientation, Mat frequency,
 			int blockSize, int windowSize, int minWaveLength, int maxWaveLength) {
@@ -689,7 +604,6 @@ public class BlockOrientation {
 				result = new Mat(rows, cols, CvType.CV_32FC1, Scalar.all((1.0 / waveLength)));
 			}
 		}
-
 		return result;
 	}
 
@@ -714,11 +628,9 @@ public class BlockOrientation {
 				}
 			}
 		}
-
 		Collections.sort(values);
 		int size = values.size();
 		double median = 0;
-
 		if (size > 0) {
 			int halfSize = size / 2;
 			if ((size % 2) == 0) {
@@ -731,10 +643,8 @@ public class BlockOrientation {
 	}
 	
 	private static double meanFrequency(Mat image) {
-
 		ArrayList<Double> values = new ArrayList<Double>();
 		double value = 0;
-
 		for (int i = 0; i < image.height(); i++) {
 			for (int j = 0; j < image.width(); j++) {
 				value = image.get(i, j)[0];
@@ -772,6 +682,7 @@ public class BlockOrientation {
 		Mat[] filters = new Mat[filterCount];
 		double sigmaX = kx / medianFreq;
 		double sigmaY = ky / medianFreq;
+		System.out.println(medianFreq);
 		// mat refFilter = exp(-(x. ^ 2 / sigmaX ^ 2 + y. ^ 2 / sigmaY ^ 2) / 2). *
 		// cos(2 * pi * medianFreq * x);
 		int size = (int) Math.round(3 * Math.max(sigmaX, sigmaY));
@@ -807,7 +718,6 @@ public class BlockOrientation {
 			Imgproc.warpAffine(refFilter, rotated, rotateMatrix, rotatedSize, Imgproc.INTER_LINEAR);
 			filters[i] = rotated;
 		}
-
 		Mat orientIndexes = new Mat(orientation.rows(), orientation.cols(), CvType.CV_8UC1);
 		Core.multiply(orientation, Scalar.all((double) filterCount / Math.PI), orientIndexes, 1.0, CvType.CV_8UC1);
 		Mat orientMask;
@@ -839,8 +749,6 @@ public class BlockOrientation {
 			}
 		}
 	}
-	
-	
 
 	private static Mat meshGrid(int input) {
 		int size = (input * 2) + 1;
@@ -870,9 +778,6 @@ public class BlockOrientation {
 	 * Histogram calculation
 	 *******************************/
 	/**********
-	 * a bemenetiÈp©©p 16*16-os blokkjaitˆ∂∂sszesen 288 db) egy Mat li·√°ba
-	 * ˚√ªj ˆ√∂ssze, majd ezeknekz·mÌtjaja ki a l·√°lis histogramjait ->
-	 * histogram adattagn ÈrtÈkeket ad: Double - Integer·√°r>
 	 * - intensity * frequency
 	 */
 	public List<Mat> matToBlockList(Mat input) throws IOException {
@@ -892,239 +797,6 @@ public class BlockOrientation {
 			Histogram histogram = new Histogram(matList.get(i));
 			this.list.get(i).setHistogramMap(histogram.histogramMap);
 		}
-	}
-
-	public Mat histogramNormalization(Mat input) { // sz√©th√∫z√°s - expanding
-		Mat out = new Mat(input.size(), input.type());
-		int countBlock = 0;
-		double blockTotalPixel = BLOCKSIZE * BLOCKSIZE;
-		Map<Double, Integer> map = new TreeMap<>();
-		for (int i = 0; i < height; i += BLOCKSIZE) {
-			for (int j = 0; j < width; j += BLOCKSIZE) {
-				map = this.list.get(countBlock).getHistogramMap();
-				for (int u = i; u < i + BLOCKSIZE; u++) {
-					for (int v = j; v < j + BLOCKSIZE; v++) {
-						double[] dataIn = input.get(u, v);
-						double[] dataOut = new double[3];
-						double cum = 0;
-						double maxIntensity = 0;
-						double minIntensity = 255;
-						Set<Double> intensitySet = map.keySet();
-						Map<Double, Integer> accumulate = new TreeMap<>();
-						for (Double d : intensitySet) {
-							if (d >= maxIntensity) {
-								maxIntensity = d;
-							}
-							if (d <= minIntensity) {
-								minIntensity = d;
-							}
-						}
-						for (Map.Entry<Double, Integer> m : map.entrySet()) {
-							double value = 255 * (m.getKey() - minIntensity) / (maxIntensity - minIntensity);
-							accumulate.put(m.getKey(), (int) value);
-						}
-						for (Map.Entry<Double, Integer> m : accumulate.entrySet()) {
-							if (dataIn[0] == m.getKey()) {
-								dataOut[0] = m.getValue();
-								dataOut[1] = m.getValue();
-								dataOut[2] = m.getValue();
-							}
-						}
-						out.put(u, v, dataOut);
-					}
-				}
-				countBlock++;
-			}
-		}
-		return out;
-	}
-
-	public Mat histogramEqualization(Mat input) {
-		Mat out = new Mat(input.size(), input.type());
-		int countBlock = 0;
-		double blockTotalPixel = BLOCKSIZE * BLOCKSIZE;
-		Map<Double, Integer> map = new TreeMap<>();
-		for (int i = 0; i < height; i += BLOCKSIZE) {
-			for (int j = 0; j < width; j += BLOCKSIZE) {
-				map = this.list.get(countBlock).getHistogramMap();
-				for (int u = i; u < i + BLOCKSIZE; u++) {
-					for (int v = j; v < j + BLOCKSIZE; v++) {
-						double[] dataIn = input.get(u, v);
-						double[] dataOut = new double[3];
-						double cum = 0;
-						int count = 1;
-						Map<Double, Long> lutValueMap = new TreeMap<>();
-						Map<Double, Integer> accumulate = new HashMap<>();
-						Map<Integer, Double> lutTable = new TreeMap<>();
-						for (Map.Entry<Double, Integer> m : map.entrySet()) {
-							lutTable.put(count, m.getKey());
-							count++;
-						}
-						for (Map.Entry<Double, Integer> m : map.entrySet()) {
-							cum += m.getValue();
-							double accumHist = cum / blockTotalPixel;
-							long lutValue = Math.round(accumHist * (lutTable.size() - 1));
-							lutValueMap.put(m.getKey(), lutValue);
-						}
-						for (Map.Entry<Double, Long> m : lutValueMap.entrySet()) {
-							for (Map.Entry<Integer, Double> l : lutTable.entrySet()) {
-								if ((long) l.getKey() == m.getValue()) {
-									double newIntensity = l.getValue();
-									// System.out.println(countBlock + "egyezik" +l.getValue() + " " + m.getKey());
-									accumulate.put(m.getKey(), (int) newIntensity);
-								}
-							}
-						}
-						for (Map.Entry<Double, Integer> m : accumulate.entrySet()) {
-							if (dataIn[0] == m.getKey()) {
-								dataOut[0] = m.getValue();
-								dataOut[1] = m.getValue();
-								dataOut[2] = m.getValue();
-							}
-						}
-						out.put(u, v, dataOut);
-					}
-				}
-				countBlock++;
-			}
-		}
-		return out;
-	}
-
-	public Mat localHistogramEqualization(Mat input, int maskSizeInput, double k_localConstans) throws IOException {
-		if (maskSizeInput % 2 == 0 || maskSizeInput <= 1) {
-			System.out.println("Mask size should be impair.");
-			return input;
-		}
-		double[][] in = matToArray(input);
-		double[][] out = new double[height][width];
-		double globalMean = mean(input);
-		double globalVariance = variance(input);
-		double globalPixelIntensity = avgGlobalPixelIntensity(input); // global mean of pixel intensity of image
-		System.out.println("Global mean: " + globalMean + ", globalVar: " + globalVariance + ", global Pixel Intens: "
-				+ globalPixelIntensity);
-		for (int i = 0; i < height; i++) {
-			for (int j = 0; j < width; j++) {
-				out[i][j] = in[i][j];
-			}
-		}
-		int maskSize = maskSizeInput / 2;
-		int maskSizeSquare = (int) Math.pow((maskSize * 2 + 1), 2);
-		for (int i = maskSize; i < height - maskSize; i++) {
-			for (int j = maskSize; j < width - maskSize; j++) {
-				// variables related to actual block
-				double actualPixel = out[i][j];
-				double newPixelValue = 0;
-				double localMean = 0;
-				double localVariance = 0;
-				Map<Double, Integer> blockHistogram = new TreeMap<>(); // intensity - frequency
-				Map<Double, Double> normalized = new TreeMap<>(); // intensity - norm.hist.
-				int countPixels = 0;
-				// pairs pixel intensity with their frequency in actual block
-				for (int u = i - maskSize; u < i + maskSize + 1; u++) {
-					for (int v = j - maskSize; v < j + maskSize + 1; v++) {
-						// if (out[u][v] != actualPixel)
-						blockHistogram.merge(out[u][v], 1, Integer::sum);
-						countPixels++;
-					}
-				}
-				// normalized histogram
-				for (Map.Entry<Double, Integer> m : blockHistogram.entrySet()) {
-					// System.out.println(m.getKey() + " " + m.getValue());
-					double norm = m.getValue() / (double) maskSizeSquare;
-					normalized.put(m.getKey(), norm);
-				}
-				// local mean calculation
-				for (Map.Entry<Double, Double> m : normalized.entrySet()) {
-					localMean += (m.getKey() * m.getValue());
-				}
-				// local variance calculation
-				for (Map.Entry<Double, Double> m : normalized.entrySet()) {
-					localVariance += (Math.pow(m.getKey() - localMean, 2) * m.getValue());
-				}
-				localVariance = Math.sqrt(localVariance);
-				// System.out.println(localMean + " " + localVariance);
-				double dev = Math.abs(actualPixel - localMean);
-				newPixelValue = (k_localConstans * globalPixelIntensity / localVariance * dev) + localMean;
-				// System.out.println(" new pixel value: " + newPixelValue);
-				out[i][j] = newPixelValue;
-			}
-		}
-		Mat outMat = arrayToMat(out);
-		return outMat;
-	}
-
-	// k0 =0.4, k1 = 0.02, k2 = 0.4, E = 4
-	public Mat gonzales(Mat input, int maskSizeInput) throws IOException {
-		if (maskSizeInput % 2 == 0 || maskSizeInput <= 1) {
-			System.out.println("Mask size should be impair.");
-			return input;
-		}
-		// k szorz√≥k a glob√°lis √©rt√©keket m√≥dos√≠tj√°k, hogy √∂sszehasonl√≠that√≥
-		// legyen a
-		// lok√°lissal
-		double k0 = 0.4; // az √≠gy m√≥dos√≠tott glob√°lis mean-n√©l kisebb vagy egyenl√µ lok√°lisok
-		double k1 = 0.02; // lok√°lis sz√≥r√°s limit szorz√≥ (hogy hagyja a null sz√≥r√°sos ter√ºleteket)
-		double k2 = 0.4; // az √≠gy m√≥dos√≠tott glob√°lis var-n√°l kisebb vagy egyenl√µ lok√°lisok
-							// ha k2 > 1-n√©l -> vil√°gos, ha k2 < 1-n√©l -> s√∂t√©t ter√ºletek jav√≠t√°sa
-		double E = 5;
-		double[][] in = matToArray(input);
-		double[][] out = new double[height][width];
-		double globalMean = mean(input);
-		double globalVariance = variance(input);
-		double globalPixelIntensity = avgGlobalPixelIntensity(input); // global mean of pixel intensity of image
-		System.out.println("Global mean: " + globalMean + ", globalVar: " + globalVariance + ", global Pixel Intens: "
-				+ globalPixelIntensity);
-		for (int i = 0; i < height; i++) {
-			for (int j = 0; j < width; j++) {
-				out[i][j] = in[i][j];
-			}
-		}
-		int maskSize = maskSizeInput / 2;
-		int maskSizeSquare = (int) Math.pow((maskSize * 2 + 1), 2);
-		for (int i = maskSize; i < height - maskSize; i++) {
-			for (int j = maskSize; j < width - maskSize; j++) {
-				// variables related to actual block
-				double actualPixel = out[i][j];
-				double newPixelValue = 0;
-				double localMean = 0;
-				double localVariance = 0;
-				Map<Double, Integer> blockHistogram = new TreeMap<>(); // intensity - frequency
-				Map<Double, Double> normalized = new TreeMap<>(); // intensity - norm.hist.
-				int countPixels = 0;
-				// pairs pixel intensity with their frequency in actual block
-				for (int u = i - maskSize; u < i + maskSize + 1; u++) {
-					for (int v = j - maskSize; v < j + maskSize + 1; v++) {
-						// if (out[u][v] != actualPixel)
-						blockHistogram.merge(out[u][v], 1, Integer::sum);
-						countPixels++;
-					}
-				}
-				// normalized histogram
-				for (Map.Entry<Double, Integer> m : blockHistogram.entrySet()) {
-					// System.out.println(m.getKey() + " " + m.getValue());
-					double norm = m.getValue() / (double) maskSizeSquare;
-					normalized.put(m.getKey(), norm);
-				}
-				// local mean calculation
-				for (Map.Entry<Double, Double> m : normalized.entrySet()) {
-					localMean += (m.getKey() * m.getValue());
-				}
-				// local variance calculation
-				for (Map.Entry<Double, Double> m : normalized.entrySet()) {
-					localVariance += (Math.pow(m.getKey() - localMean, 2) * m.getValue());
-				}
-				localVariance = Math.sqrt(localVariance);
-				// System.out.println(localMean + " " + localVariance);
-				if (localMean <= k0 * globalMean && localVariance >= k1 * globalVariance
-						&& localVariance <= k2 * globalVariance) {
-					newPixelValue *= E;
-					out[i][j] = newPixelValue;
-				}
-			}
-		}
-		Mat outMat = arrayToMat(out);
-		return outMat;
 	}
 
 	/*****************************
@@ -1167,94 +839,6 @@ public class BlockOrientation {
 		return variance;
 	}
 
-	public double avgGlobalPixelIntensity(Mat input) throws IOException {
-		Histogram histogram = new Histogram(input);
-		Map<Double, Integer> map = histogram.histogramMap;
-		double sumIntensity = 0;
-		for (Map.Entry<Double, Integer> m : map.entrySet()) {
-			sumIntensity += m.getKey();
-		}
-		return sumIntensity / (double) map.size();
-	}
-
-	public Mat contrast(Mat input) {
-		Mat out = new Mat(input.size(), input.type());
-		if (input.type() != 0) {
-			Imgproc.cvtColor(input, input, Imgproc.COLOR_RGB2GRAY);
-		}
-		Imgproc.equalizeHist(input, out);
-		return out;
-	}
-
-	public Mat gammaCorrection(Mat input, double gamma) {
-		Mat out = input.clone();
-		double exp = 1 / gamma;
-		for (int i = 0; i < height; i++) {
-			for (int j = 0; j < width; j++) {
-				double[] data = out.get(i, j);
-				double norm = data[0] / 256;
-				double v = Math.pow(norm, exp);
-				v = v * 256;
-				data[0] = v;
-				data[1] = v;
-				data[2] = v;
-				out.put(i, j, data);
-			}
-		}
-		return out;
-	}
-
-	public Mat brightness(Mat input, double alpha, double beta) {
-		alpha = 1;
-		beta = 10;
-		Mat out = new Mat(input.size(), input.type());
-		input.convertTo(out, -1, alpha, beta); // alhpa (scale factor) beta (delta added to alpha) optional
-		return out;
-	}
-
-	public Mat sharpness(Mat input) {
-		Mat out = new Mat(input.size(), input.type());
-		Imgproc.GaussianBlur(input, out, new Size(0, 0), 10);
-		Core.addWeighted(input, 1.3, out, -0.6, 1, out);
-		return out;
-	}
-
-	public static void sobel(Mat input) throws IOException {
-		Mat dx = new Mat(input.size(), input.type());
-		Mat dy = new Mat(input.size(), input.type());
-		Imgproc.Sobel(input, dx, CvType.CV_32F, 1, 0);
-		Imgproc.Sobel(input, dy, CvType.CV_32F, 0, 1);
-		resizeAndShow(input, "Original");
-		resizeAndShow(dx, "dx");
-		resizeAndShow(dy, "dy");
-	}
-
-	public static void writeFile(String whereTo, String what) {
-		BufferedWriter bw;
-		try {
-			bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(whereTo)));
-			bw.write(what);
-			bw.flush();
-			bw.close();
-			System.out.println("Txt file with bitmap is done.");
-		} catch (IOException e) {
-			e.getMessage();
-		}
-	}
-
-	public static String dump(Mat input) {
-		StringBuilder sb = new StringBuilder();
-		int count = 0;
-		for (int i = 0; i < height; i++) {
-			for (int j = 0; j < width; j++) {
-				double[] data = input.get(i, j);
-				sb.append(data[0] + "\t");
-				count++;
-			}
-			sb.append("\n" + i + ". row:\t");
-		}
-		return sb.toString();
-	}
 // segÈdf¸ggvÈny: 2 D m·trixot Mat obj-m· alakÌt (3 csatorn·s)
 	public static Mat arrayToMat(double[][] a) {
 		Mat m = new Mat(height, width, matrixType);
@@ -1300,57 +884,5 @@ public class BlockOrientation {
 		return result;
 	}
 	
-	public Mat getMarrHildreth(Mat src, int kernelDiameter, double sigma) {
-		int kernel_size = kernelDiameter / 2;
-		Mat kernel = new Mat(kernelDiameter, kernelDiameter, CvType.CV_64FC1);
-		for (int i = -kernel_size; i <= kernel_size; i++) {
-			for (int j = -kernel_size; j <= kernel_size; j++) {
-				double data = Math.exp(-((Math.pow(j, 2) + Math.pow(i, 2)) /
-					(Math.pow(sigma, 2) * 2))) * (((Math.pow(j, 2) + Math.pow(i, 2) - 2 *
-						Math.pow(sigma, 2)) / (2 * Math.pow(sigma, 4))));
-				kernel.put(i + kernel_size,  j + kernel_size, data);
-			}
-		}
-		for (int i=0;i<kernel.height();i++) {
-			for (int j=0;j<kernel.width();j++) {
-				System.out.print(kernel.get(i, j)[0] + " ");
-			} 
-			System.out.println();
-		}
-		Mat laplacian = new Mat(src.rows() - kernel_size * 2, src.cols() - kernel_size * 2, CvType.CV_64FC1);
-		Mat dst = Mat.zeros(src.rows() - kernel_size * 2, src.cols() - kernel_size * 2, CvType.CV_8UC1);
-		for (int i = kernel_size; i < src.rows() - kernel_size; i++) {
-			for (int j = kernel_size; j < src.cols() - kernel_size; j++) {
-				double sum = 0;
-				for (int x = -kernel_size; x <= kernel_size; x++){
-					for (int y = -kernel_size; y <= kernel_size; y++) {
-						double dataSrc = src.get(i + x, j + y)[0];
-						double dataKernel = kernel.get(x + kernel_size,y + kernel_size)[0];
-						sum += dataSrc * dataKernel;
-					}
-				}
-				laplacian.put(i-kernel_size, j-kernel_size, sum);
-			}
-		}
-		for (int i = 1; i < dst.rows() - 1; i++) {
-			for (int j = 1; j < dst.cols() - 1; j++) {
-				double data = laplacian.get(i, j)[0];
-				double data1 = laplacian.get(i - 1, j)[0];
-				double data2 = laplacian.get(i + 1, j)[0];
-				double data3 = laplacian.get(i, j + 1)[0];
-				double data4 = laplacian.get(i, j - 1)[0];
-				double data5 = laplacian.get(i + 1, j - 1)[0];
-				double data6 = laplacian.get(i - 1, j + 1)[0];
-				double data7 = laplacian.get(i - 1, j - 1)[0];
-				double data8 = laplacian.get(i + 1, j + 1)[0];
-				if ((data1 * data2) < 0 || (data3 * data4) < 0 ||
-					(data5 * data6) < 0 || (data7 * data8) < 0) {
-					data = 255;
-					
-				}
-				dst.put(i, j, data);
-			}
-		}
-		return dst;
-	}
+
 }

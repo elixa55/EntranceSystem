@@ -60,6 +60,7 @@ import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
 import javafx.scene.control.Alert.AlertType;
+import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.TabPane;
 import jssc.SerialPort;
@@ -139,6 +140,12 @@ public class ViewController implements Initializable {
 	private MenuItem contextDelete;
 	@FXML
 	private ContextMenu context;
+	@FXML
+	private Button editButton;
+	@FXML
+	private Button importButton;
+	@FXML
+	private Button adminButton;
 
 	/**
 	 * static global variables
@@ -146,7 +153,7 @@ public class ViewController implements Initializable {
 	final private static PersonDao database = new PersonDaoImpl();
 	public static ObservableList<Person> personData = database.get();
 	private static String userDir = System.getProperty("user.dir") + "\\";
-	
+
 	private static String actualFinger = null;
 	private static ImageProcessing ip = null;
 	private static BufferedImage imageToSave;
@@ -293,14 +300,13 @@ public class ViewController implements Initializable {
 	}
 
 	/**
-	 * modify the selected fields' values
+	 * modify the selected fields' values by users
 	 * 
 	 * @param event
 	 */
 	@FXML
 	public void buttonEdit(ActionEvent event) {
 		Person p = new Person();
-		System.out.println(logged.getId());
 		p.setId(logged.getId());
 		p.setFirstname(editFirstname.getText());
 		p.setLastname(editLastname.getText());
@@ -313,18 +319,37 @@ public class ViewController implements Initializable {
 	}
 
 	/**
+	 * modify the selected fields' values by admin
+	 * 
+	 * @param event
+	 */
+	@FXML
+	public void buttonAdmin(ActionEvent event) {
+		Person p = new Person();
+		if (selectedId != null) {
+			p.setId(selectedId);
+			p.setFirstname(editFirstname.getText());
+			p.setLastname(editLastname.getText());
+			p.setFinger(editFinger.getText());
+			p.setOccupation(editOccupation.getText());
+			p.setPassword(editPassword.getText());
+			database.update(p);
+			refresh();
+			message("You have successfully updated.");
+		}
+		else {
+			message("You have not selected user record.");
+		}
+	}
+
+	/**
 	 * get image from file browser to make fingerprint signature
 	 * 
 	 * @param event
 	 */
 	@FXML
 	public void buttonImportImage(ActionEvent event) {
-		FileChooser fileChooser = new FileChooser();
-		fileChooser.setTitle("Image read");
-		fileChooser.setInitialDirectory(new File(System.getProperty("user.dir"),
-				"\\src\\fingerprints"));
-		fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("*.bmp", "*.bmp"));
-		File file = fileChooser.showOpenDialog(EntranceSystem.getPrimaryStage());
+		File file = chooseFile();
 		if (file != null) {
 			try {
 				String fileName = file.toString().replace(userDir, "");
@@ -361,6 +386,9 @@ public class ViewController implements Initializable {
 		if (logged.getLastname().equals("admin")) {
 			contextImportImage.setVisible(false);
 			contextDelete.setVisible(false);
+			editButton.setVisible(true);
+			importButton.setVisible(true);
+			adminButton.setVisible(false);
 		}
 		tabPane.getTabs().get(3).setDisable(true);
 		loggedText.setText("");
@@ -376,12 +404,7 @@ public class ViewController implements Initializable {
 	 */
 	@FXML
 	public void contextTableImage(ActionEvent event) {
-		FileChooser fileChooser = new FileChooser();
-		fileChooser.setTitle("Image read");
-		fileChooser.setInitialDirectory(new File(System.getProperty("user.dir"),
-				"\\src\\fingerprints"));
-		fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("*.bmp", "*.bmp"));
-		File file = fileChooser.showOpenDialog(EntranceSystem.getPrimaryStage());
+		File file = chooseFile();
 		if (file != null) {
 			try {
 				String fileName = file.toString().replace(userDir, "");
@@ -456,6 +479,9 @@ public class ViewController implements Initializable {
 			if (logged.getLastname().equals("admin")) {
 				contextImportImage.setVisible(true);
 				contextDelete.setVisible(true);
+				adminButton.setVisible(true);
+				editButton.setVisible(false);
+				importButton.setVisible(false);
 			}
 		}
 		staticLogin.close();
@@ -471,8 +497,10 @@ public class ViewController implements Initializable {
 		Platform.exit();
 	}
 
-	/*Export to *.csv, custom settings: column enclosed / escaped by ' char,
-	 * remove the first row (column name) manually */
+	/*
+	 * Export to *.csv, custom settings: column enclosed / escaped by ' char, remove
+	 * the first row (column name) manually
+	 */
 	/**
 	 * 2, Import menu -> 1th submenu -> import database file from file browser
 	 * 
@@ -480,11 +508,7 @@ public class ViewController implements Initializable {
 	 */
 	@FXML
 	public void menuImportDB(ActionEvent event) {
-		FileChooser fileChooser = new FileChooser();
-		fileChooser.setTitle("Database import");
-		fileChooser.setInitialDirectory(new File(System.getProperty("user.home"), "eclipse-workspace"));
-		fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("*.csv", "*.csv"));
-		File file = fileChooser.showOpenDialog(EntranceSystem.getPrimaryStage());
+		File file = chooseFile();
 		if (file != null) {
 			try {
 				List<String> reading = Files.readAllLines(Paths.get(file.getPath()));
@@ -522,67 +546,68 @@ public class ViewController implements Initializable {
 		table.setItems(personData);
 	}
 
-	/**IDENTIFY (1:N) matching
-	 * matching the enrolled element to all elements of database
+	/**
+	 * IDENTIFY (1:N) matching matching the enrolled element to all elements of
+	 * database
+	 * 
 	 * @param event
 	 */
 	@FXML
 	public void buttonIdentify(ActionEvent event) {
 		if (!flagVerify) {
-		String text = "";
-		try {
-			if (selectedFile != null || actualFinger != null) {
-				List<String> names = new ArrayList<String>();
-				double threshold = 30; // corresponds to FMR (false match rate) 0.01%
-				if (selectedFile != null) {
-					String fileName = selectedFile.toString().replace(userDir, "");
-					ip = new ImageProcessing(fileName);
-					text += "File selected: " + fileName + "\n";
-				}
-				else if (actualFinger != null) {
-					ip = new ImageProcessing(actualFinger);
-				}
-				List<Minutiae> sortedList = ip.getFinalMinutiaeSet();
-				String candidateSignature = minutiaeListToString(sortedList);
-				System.out.println(candidateSignature);
-				FingerprintTemplate candidate = new FingerprintTemplate().deserialize(candidateSignature);
-				for (Person p : personData) {
-					double score = 0;
-					if (p.getFinger() != null && !p.getFinger().equals("")) {
-						FingerprintTemplate template = new FingerprintTemplate().deserialize(p.getFinger());
-						score = new FingerprintMatcher().index(template).match(candidate);
+			String text = "";
+			try {
+				if (selectedFile != null || actualFinger != null) {
+					List<String> names = new ArrayList<String>();
+					double threshold = 30; // corresponds to FMR (false match rate) 0.01%
+					if (selectedFile != null) {
+						String fileName = selectedFile.toString().replace(userDir, "");
+						ip = new ImageProcessing(fileName);
+						text += "File selected: " + fileName + "\n";
+					} else if (actualFinger != null) {
+						ip = new ImageProcessing(actualFinger);
 					}
-					boolean matches = score >= threshold;
-					text += "score: " + String.valueOf(score) + "\t";
-					if (matches) {
-						text += "ID: " + p.getId() + " Name: " + p.getLastname() + " matches\n";
-						names.add(p.getLastname());
-					} else {
-						text += "ID: " + p.getId() + " Name: " + p.getLastname() + " doesn't match\n";
+					List<Minutiae> sortedList = ip.getFinalMinutiaeSet();
+					String candidateSignature = minutiaeListToString(sortedList);
+					System.out.println(candidateSignature);
+					FingerprintTemplate candidate = new FingerprintTemplate().deserialize(candidateSignature);
+					for (Person p : personData) {
+						double score = 0;
+						if (p.getFinger() != null && !p.getFinger().equals("")) {
+							FingerprintTemplate template = new FingerprintTemplate().deserialize(p.getFinger());
+							score = new FingerprintMatcher().index(template).match(candidate);
+						}
+						boolean matches = score >= threshold;
+						text += "score: " + String.valueOf(score) + "\t";
+						if (matches) {
+							text += "ID: " + p.getId() + " Name: " + p.getLastname() + " matches\n";
+							names.add(p.getLastname());
+						} else {
+							text += "ID: " + p.getId() + " Name: " + p.getLastname() + " doesn't match\n";
+						}
 					}
+					text += "Person(s) with matching finger\n";
+					for (String str : names) {
+						text += str;
+						text += "\n";
+					}
+					System.out.println(text);
+					textBox.setText(text);
+				} else {
+					message("First enroll fingerprint");
 				}
-				text += "Person(s) with matching finger\n";
-				for (String str : names) {
-					text += str;
-					text += "\n";
-				}
-				System.out.println(text);
-				textBox.setText(text);
-			}else {
-				message("First enroll fingerprint");
+			} catch (Exception e) {
+				System.out.println(e.getMessage() + e);
+				System.out.println("Attention! File reading error");
 			}
-		}catch(Exception e) {
-			System.out.println(e.getMessage() + e);
-			System.out.println("Attention! File reading error");
-		}
 		} else {
 			message("You can not match during identification.");
 		}
 	}
 
 	/**
-	 * VERIFY (1:1 match)
-	 * mathching the logged user to one specified element of database
+	 * VERIFY (1:1 match) mathching the logged user to one specified element of
+	 * database
 	 * 
 	 * @param event
 	 */
@@ -640,9 +665,8 @@ public class ViewController implements Initializable {
 		File file = null;
 		FileChooser fileChooser = new FileChooser();
 		fileChooser.setTitle("Image read");
-		fileChooser.setInitialDirectory(
-				new File(System.getProperty("user.dir"), "\\"));
-		fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("*.bmp", "*.bmp"));
+		fileChooser.setInitialDirectory(new File(System.getProperty("user.dir"), "\\"));
+		fileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("*.bmp", "*.bmp"), new FileChooser.ExtensionFilter("*.jpg", "*.jpg"));
 		file = fileChooser.showOpenDialog(EntranceSystem.getPrimaryStage());
 		return file;
 	}
@@ -656,22 +680,22 @@ public class ViewController implements Initializable {
 	@FXML
 	public void buttonLoad(ActionEvent event) {
 		if (!flagVerify) {
-		probeImage.setImage(null);
-		selectedFile = chooseFile();
-		FileInputStream inputstream;
-		String fileName = null;
-		if (selectedFile != null) {
-			try {
-				fileName = selectedFile.toString().replace(userDir, "");
-				inputstream = new FileInputStream(fileName);
-				Image image = new Image(inputstream);
-				probeImage.setImage(image);
-				probeImage.setVisible(true);
-				actualFinger = null;
-			} catch (Exception e) {
-				System.out.println(e.getMessage() + "Image show problems");
+			probeImage.setImage(null);
+			selectedFile = chooseFile();
+			FileInputStream inputstream;
+			String fileName = null;
+			if (selectedFile != null) {
+				try {
+					fileName = selectedFile.toString().replace(userDir, "");
+					inputstream = new FileInputStream(fileName);
+					Image image = new Image(inputstream);
+					probeImage.setImage(image);
+					probeImage.setVisible(true);
+					actualFinger = null;
+				} catch (Exception e) {
+					System.out.println(e.getMessage() + "Image show problems");
+				}
 			}
-		}
 		} else {
 			message("You can not load image during identification.");
 		}
@@ -762,10 +786,12 @@ public class ViewController implements Initializable {
 				imshow(ip.getRidgeOrientationShow(), "4 - Orientation");
 				imshow(ip.getSegmentedRidge(), "5 - Segmented");
 				imshow(ip.getFilteredRidgeShow(), "6 - Filtered");
-				imshow(ip.getOpenedRidge(), "7 - Thinned");
-				imshow(ip.getBinarizedRidge(), "8 - Binarized");
-				imshow(ip.getWithAnglesRidge(), "9 - All candidate minutiae");
-				imshow(ip.getMinutiaeExtractedRidge(), "9 - Minutiae Extracted");
+				imshow(ip.getBinarizedRidge(), "7 - Binarized");
+				imshow(ip.getThinnedRidge(), "8 - Thinned");
+				imshow(ip.getThinnedValley(), "9 - Thinned valley");
+				imshow(ip.getOpenedValley(), "10 - Valley after preprocessing");
+				imshow(ip.getWithAnglesRidge(), "11 - All candidate minutiae");
+				imshow(ip.getMinutiaeExtractedRidge(), "12 - Minutiae Extracted");
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
@@ -847,7 +873,7 @@ public class ViewController implements Initializable {
 			}
 		}
 	}
-	
+
 	/**
 	 * 6. Image processing menu: pixel wise orientation of image
 	 * 
@@ -904,28 +930,9 @@ public class ViewController implements Initializable {
 			}
 		}
 	}
-
+	
 	/**
-	 * 9. Image processing menu: thinned image
-	 * 
-	 * @param event
-	 * @throws Exception
-	 */
-	@FXML
-	void menuThin(ActionEvent event) throws Exception {
-		if (ip == null) {
-			message("First enroll your finger!!");
-		} else {
-			try {
-				imshow(ip.getOpenedRidge(), "7 - Thinned");
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-		}
-	}
-
-	/**
-	 * 10. Image processing menu: binarized image
+	 * 9. Image processing menu: binarized image
 	 * 
 	 * @param event
 	 * @throws Exception
@@ -936,7 +943,7 @@ public class ViewController implements Initializable {
 			message("First enroll your finger!!");
 		} else {
 			try {
-				imshow(ip.getBinarizedRidge(), "8 - Binarized");
+				imshow(ip.getBinarizedRidge(), "7 - Binarized");
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
@@ -944,7 +951,64 @@ public class ViewController implements Initializable {
 	}
 
 	/**
-	 * 11. Image processing menu: all candidate minutiae
+	 * 10. Image processing menu: thinned image
+	 * 
+	 * @param event
+	 * @throws Exception
+	 */
+	@FXML
+	void menuThin(ActionEvent event) throws Exception {
+		if (ip == null) {
+			message("First enroll your finger!!");
+		} else {
+			try {
+				imshow(ip.getThinnedRidge(), "8 - Thinned");
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+	}
+	
+	/**
+	 * 11. Image processing menu: thinned valley
+	 * 
+	 * @param event
+	 * @throws Exception
+	 */
+	@FXML
+	void menuValley(ActionEvent event) throws Exception {
+		if (ip == null) {
+			message("First enroll your finger!!");
+		} else {
+			try {
+				imshow(ip.getThinnedValley(), "9 - Thinned valley");
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 * 12. Image processing menu: thinned valley after preprocessing
+	 * 
+	 * @param event
+	 * @throws Exception
+	 */
+	@FXML
+	void menuPreprocessing(ActionEvent event) throws Exception {
+		if (ip == null) {
+			message("First enroll your finger!!");
+		} else {
+			try {
+				imshow(ip.getOpenedValley(), "10 - Thinned valley after preprocessing");
+			} catch (IOException e1) {
+				e1.printStackTrace();
+			}
+		}
+	}
+
+	/**
+	 * 13. Image processing menu: all candidate minutiae
 	 * 
 	 * @param event
 	 * @throws Exception
@@ -955,7 +1019,7 @@ public class ViewController implements Initializable {
 			message("First enroll your finger!!");
 		} else {
 			try {
-				imshow(ip.getWithAnglesRidge(), "9 - All candidate minutiae");
+				imshow(ip.getWithAnglesRidge(), "11 - All candidate minutiae");
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
@@ -963,7 +1027,7 @@ public class ViewController implements Initializable {
 	}
 
 	/**
-	 * 12. Image processing menu: minutiae extracted
+	 * 14. Image processing menu: minutiae extracted
 	 * 
 	 * @param event
 	 * @throws Exception
@@ -974,7 +1038,7 @@ public class ViewController implements Initializable {
 			message("First enroll your finger!!");
 		} else {
 			try {
-				imshow(ip.getMinutiaeExtractedRidge(), "10 - Minutiae Extracted");
+				imshow(ip.getMinutiaeExtractedRidge(), "12 - Minutiae Extracted");
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}

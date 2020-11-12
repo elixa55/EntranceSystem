@@ -2,6 +2,7 @@ package processing;
 
 import static processing.ImageProcessing.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -18,26 +19,28 @@ import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
-
 public class RidgesMap {
 
-	/**private class variables
+	/**
+	 * private class variables
 	 * 
 	 */
 	private Set<Minutiae> set;
 	private Mat matrix;
 	private Map<Cell, Ridges> minutiaeMap;
 	private Map<Minutiae, Ridges> minutiaeMapFinal;
-	
 
-	/**constructor
-	 * create the minutiaeMapFinal member in that
-	 * maps the minutiae -> Ridges (all calculated data of minutiae)
+	/**
+	 * constructor create the minutiaeMapFinal member in that maps the minutiae ->
+	 * Ridges (all calculated data of minutiae)
+	 * 
 	 * @param matrix
+	 * @throws IOException
 	 */
-	public RidgesMap(Mat matrix) {
+	public RidgesMap(Mat matrix) throws IOException {
 		this.matrix = matrix;
 		double[][] thinnedArrayRidge = matToArray(matrix);
+		//double [][] correctedThinnedRidge = doubleBifurcation(thinnedArrayRidge);
 		this.set = minutiaeList(thinnedArrayRidge);
 		this.minutiaeMap = new HashMap<Cell, Ridges>();
 		Map<Cell, Minutiae> minutiaePoints = new HashMap<Cell, Minutiae>();
@@ -66,7 +69,10 @@ public class RidgesMap {
 		}
 	}
 
-	/**calculates the data about terminations, bifurcations
+
+	/**
+	 * calculates the data about terminations, bifurcations
+	 * 
 	 * @param thinned
 	 */
 	public void calculateRidgesData(LogicMatrix thinned) {
@@ -79,40 +85,117 @@ public class RidgesMap {
 	}
 
 	
-	/**marks all minutiae in thinned image 
-	 * by Cross Number (CN) method 
+	public double [][] doubleBifurcation(double[][] array)  {
+		double [][] out = new double[288][256];
+		for (int i= 0; i < height; i++) {
+			for (int j = 0; j < width; j++) {
+				out[i][j] = array[i][j];
+			}
+		}
+		for (int i = 1; i < height - 1; i++) {
+			for (int j = 1; j < width - 1; j++) {
+				double cn = cnCalculation(i, j, out);
+				if (cn == 2 && out[i][j] == 1 && validationBugPixel(i, j, out)) {
+					out[i][j] = 0;
+				}
+				if (cn == 2 && out[i][j] == 1 && !validationBugPixel(i, j, out)) {
+					out[i][j] = 1;
+				} 
+			}
+		}
+		return out;
+	}
+	
+	
+	/**
+	 * marks all minutiae in thinned image by Cross Number (CN) method
+	 * 
 	 * @param array
 	 * @return in Minutiae Set
+	 * @throws IOException
 	 */
-	public Set<Minutiae> minutiaeList(double[][] array) {
+	public Set<Minutiae> minutiaeList(double[][] array) throws IOException {
+		Mat out = this.matrix.clone();
 		Set<Minutiae> allMinutiaeList = new HashSet<Minutiae>();
 		for (int i = 1; i < height - 1; i++) {
 			for (int j = 1; j < width - 1; j++) {
-				double cn = 0;
-				double R1 = array[i][j + 1];
-				double R2 = array[i - 1][j + 1];
-				double R3 = array[i - 1][j];
-				double R4 = array[i - 1][j - 1];
-				double R5 = array[i][j - 1];
-				double R6 = array[i + 1][j - 1];
-				double R7 = array[i + 1][j];
-				double R8 = array[i + 1][j + 1];
-				cn = ((Math.abs(R1 - R2) + Math.abs(R2 - R3) + Math.abs(R3 - R4) + Math.abs(R4 - R5) + Math.abs(R5 - R6)
-						+ Math.abs(R6 - R7) + Math.abs(R7 - R8) + Math.abs(R8 - R1)) / 2);
-				if (cn > 2 && array[i][j] == 1) {
+				double cn = cnCalculation(i, j, array);
+				if (cn == 3 && array[i][j] == 1) {
 					Minutiae temp = new Minutiae(new Point(j, i), "bifurcation");
 					allMinutiaeList.add(temp);
 				} else if (cn == 1 && array[i][j] == 1) {
 					Minutiae temp = new Minutiae(new Point(j, i), "ending");
 					allMinutiaeList.add(temp);
-				}
+				} if (cn == 4 && array[i][j] == 1) {
+					Imgproc.circle(out, new Point(j, i), 5, new Scalar(255,  0,  0));
+				} 
 			}
 		}
+		//resizeAndShow(out, "double bifurcation");
 		return allMinutiaeList;
 	}
 
-	/**method auxiliary: Mat object (3 channels) -> double array of 2 dimensions
-	 * (256 × 288)
+	public int isFourConnected(int i, int j, double[][] array) {
+		boolean valid = false;
+		int count = 0;
+		for (int u = i - 1; u < i + 2; u++) {
+			for (int v = j - 1; v < j + 2; v++) {
+				if (!(u == i && v == j)) {
+					if (array[u][v] == 1) {
+						count++;
+					}
+				}
+			}
+		}
+		if (count >= 4)
+			valid = true;
+		return count;
+	}
+
+	public boolean validationBugPixel(int i, int j, double[][] array) {
+		boolean valid = false;
+		int count = 0;
+		for (int u = i - 1; u < i + 2; u++) {
+			for (int v = j - 1; v < j + 2; v++) {
+				if (!(i == u && v == j)) {
+					if (isFourConnected(u, v, array) >=4) {
+						count++;
+					}
+				}
+			}
+		}
+		if (count > 2) {
+			valid = true;
+			System.out.println("ertek: " + j + " " + i + " " + count);
+		}
+		return valid;
+	}
+
+	/**calculate the Crossing Number for each pixel
+	 * @param i
+	 * @param j
+	 * @param array
+	 * @return Crossing Number
+	 */
+	public double cnCalculation(int i, int j, double[][] array) {
+		double cn = 0;
+		double R1 = array[i][j + 1];
+		double R2 = array[i - 1][j + 1];
+		double R3 = array[i - 1][j];
+		double R4 = array[i - 1][j - 1];
+		double R5 = array[i][j - 1];
+		double R6 = array[i + 1][j - 1];
+		double R7 = array[i + 1][j];
+		double R8 = array[i + 1][j + 1];
+		cn = ((Math.abs(R1 - R2) + Math.abs(R2 - R3) + Math.abs(R3 - R4) + Math.abs(R4 - R5) + Math.abs(R5 - R6)
+				+ Math.abs(R6 - R7) + Math.abs(R7 - R8) + Math.abs(R8 - R1)) / 2);
+		return cn;
+	}
+
+	/**
+	 * method auxiliary: Mat object (3 channels) -> double array of 2 dimensions
+	 * (256 � 288)
+	 * 
 	 * @param m
 	 * @return
 	 */
@@ -130,8 +213,9 @@ public class RidgesMap {
 		return out;
 	}
 
-	
-	/**draw marking circles for candidate minutiae in input (always thinned) image
+	/**
+	 * draw marking circles for candidate minutiae in input (always thinned) image
+	 * 
 	 * @return
 	 */
 	public Mat drawMinutiae() {
@@ -149,7 +233,9 @@ public class RidgesMap {
 		this.minutiaeMapFinal.remove(minutia);
 	}
 
-	/**visualizes in thinned image each termination
+	/**
+	 * visualizes in thinned image each termination
+	 * 
 	 * @return
 	 */
 	public Mat terminationMatrix() {
@@ -178,8 +264,9 @@ public class RidgesMap {
 		return out;
 	}
 
-
-	/**visualizes in thinned image each bifurcation (blue)
+	/**
+	 * visualizes in thinned image each bifurcation (blue)
+	 * 
 	 * @return
 	 */
 	public Mat bifurcationMatrix() {
@@ -207,8 +294,10 @@ public class RidgesMap {
 		return out;
 	}
 
-	/**calculates the angles of bifurcations
-	 * in base of the angles of terminations of its dual image
+	/**
+	 * calculates the angles of bifurcations in base of the angles of terminations
+	 * of its dual image
+	 * 
 	 * @param dualMap
 	 */
 	public void calculateBifurcation(Map<Minutiae, Ridges> dualMap) {
@@ -228,13 +317,14 @@ public class RidgesMap {
 				}
 			}
 			if (findNeighbour) {
-					Map.Entry<Double, Minutiae> minutia = neighbours.firstEntry();
-					bif.getKey().setOrientation(minutia.getValue().getOrientation());
+				Map.Entry<Double, Minutiae> minutia = neighbours.firstEntry();
+				bif.getKey().setOrientation(minutia.getValue().getOrientation());
 			}
 		}
 	}
 
-	/** in member minutiaeMapFinal set the angle of each termination
+	/**
+	 * in member minutiaeMapFinal set the angle of each termination
 	 * 
 	 */
 	public void setOrientationForTermination() {
@@ -245,7 +335,9 @@ public class RidgesMap {
 		}
 	}
 
-	/**gives the suitable orientation (from 8 direction) of the mask
+	/**
+	 * gives the suitable orientation (from 8 direction) of the mask
+	 * 
 	 * @param start
 	 * @param length
 	 * @param index
@@ -255,12 +347,14 @@ public class RidgesMap {
 		return start + index < length ? start + index : start + index - length;
 	}
 
-	/**for each termination point find the nearest pixels 
-	 * round the minutia and save them in terminations member
+	/**
+	 * for each termination point find the nearest pixels round the minutia and save
+	 * them in terminations member
+	 * 
 	 * @param thinned
 	 */
 	private void findTerminations(LogicMatrix thinned) {
-		int ridgePixelSize = 10;
+		int ridgePixelSize = 15;
 		for (Map.Entry<Cell, Ridges> minutiaPoint : this.minutiaeMap.entrySet()) {
 			if (minutiaPoint.getValue().type.equals("ending")) {
 				minutiaPoint.getValue().terminations.add(minutiaPoint.getKey());
@@ -291,15 +385,13 @@ public class RidgesMap {
 		}
 	}
 
-
-	/**each bifurcation points has 3 branches 
-	 * find the nearest pixels round the minutia
-	 * and save them in bifurcations member
+	/**
+	 * each bifurcation points has 3 branches find the nearest pixels round the
+	 * minutia and save them in bifurcations member
+	 * 
 	 * @param thinned
 	 */
 	private void findBifurcations(LogicMatrix thinned) {
-		// for bifurcation - beletöltjük minden minucia pontra
-		// az elágazások kezdőpontjait, ált. 3 szomszéd, de néha 4
 		for (Map.Entry<Cell, Ridges> minutiaPoint : this.minutiaeMap.entrySet()) {
 			if (minutiaPoint.getValue().type.equals("bifurcation")) {
 				minutiaPoint.getValue().bifurcations.add(minutiaPoint.getKey());
@@ -311,13 +403,11 @@ public class RidgesMap {
 				}
 			}
 		}
-		// minden elágazás minuciaponthoz (Cell) - beletöltjük egy Set-be a redőelágazás
-		// pixel pontokat
 		for (Map.Entry<Cell, Ridges> map : this.minutiaeMap.entrySet()) {
 			if (map.getValue().type.equals("bifurcation")) {
 				int length = 8;
 				int countMask = 8;
-				int neighbourhoodSize = 10;
+				int neighbourhoodSize = 15;
 				int c, d, e = 0;
 				for (int step = 0; step < countMask; step++) {
 					c = 0;
@@ -346,21 +436,18 @@ public class RidgesMap {
 								if (thinned.get(current, false)) {
 									map.getValue().bifurcations.add(current);
 								}
-//											else {
-//												e = neighbourhoodSize-1;
-//											}
 								e++;
 							} while (e < neighbourhoodSize);
 						}
-					} // while - egyes maszkon belül a maszk minden elemén végig - length számol (8)
-				} // for - mind a 8 maszkon végigmenjen - countMask számol (8)
-			} // for belső
-		} // for külső
+					}
+				} 
+			} 
+		} 
 	}
 
-	
-	/**each bifurcation has 3 neighbours
-	 * each neighbour has the farest point from all ridge pixels (bifurcations member)
+	/**
+	 * each bifurcation has 3 neighbours each neighbour has the farest point from
+	 * all ridge pixels (bifurcations member)
 	 */
 	private void farPoints() {
 		for (Map.Entry<Cell, Ridges> e : this.minutiaeMap.entrySet()) {
@@ -399,9 +486,9 @@ public class RidgesMap {
 		}
 	}
 
-	/**each termination has 3 branches
-	 * generate the pairs map of the nearest and the farest points 
-	 * from the pixels of branches
+	/**
+	 * each termination has 3 branches generate the pairs map of the nearest and the
+	 * farest points from the pixels of branches
 	 */
 	private void pointPairs() {
 		for (Map.Entry<Cell, Ridges> m : this.minutiaeMap.entrySet()) {
@@ -422,9 +509,10 @@ public class RidgesMap {
 		}
 	}
 
-	/** calculates the angle from x axis of each termination
-	 * angle of the session between the minutia point and the farest point
-	 *  
+	/**
+	 * calculates the angle from x axis of each termination angle of the session
+	 * between the minutia point and the farest point
+	 * 
 	 */
 	private void terminationAngle() {
 		for (Map.Entry<Cell, Ridges> m : this.minutiaeMap.entrySet()) {
@@ -444,23 +532,14 @@ public class RidgesMap {
 				double angleOriginal = orientation(m.getKey(), maxCell);
 //				Cell newTerm = termangle2(maxCell, list, angleOriginal);
 				angleOriginal = orientationForFullAngle(angleOriginal);
-//				double newAngle  = orientation(newTerm, maxCell);
-//				newAngle = orientationForFullAngle(newAngle);
-//				if (Math.abs(angleOriginal - newAngle) > Math.toRadians(45)
-//						&& newTerm != null) {
-//					m.getValue().setAngleTerm(newAngle);
-//					m.getValue().setNewPoint(newTerm);
-//					m.getValue().setDiffer(true);
-//				}
-//				else {
-					m.getValue().setAngleTerm(angleOriginal);
-//					m.getValue().setDiffer(true);
-//				}
+				m.getValue().setAngleTerm(angleOriginal);
 			}
 		}
 	}
-	
-	/**marks the terminations differing from normal ridge orientation
+
+	/**
+	 * marks the terminations differing from normal ridge orientation
+	 * 
 	 * @param base
 	 * @param list
 	 * @param angleOriginal
@@ -468,15 +547,14 @@ public class RidgesMap {
 	 */
 	public static Cell termangle2(Cell base, List<Cell> list, double angleOriginal) {
 		Map<Cell, Double> map = new HashMap<>();
-		
 		double sum = 0;
 		double avg = 0;
-		for (int i=1;i<list.size();i++) {
+		for (int i = 1; i < list.size(); i++) {
 			double temp = orientation(base, list.get(i));
 			sum += temp;
 			map.put(list.get(i), temp);
 		}
-		avg = sum / (list.size()-1);
+		avg = sum / (list.size() - 1);
 		double max = Double.MIN_VALUE;
 		Cell p = null;
 		double szog = 0;
@@ -499,9 +577,10 @@ public class RidgesMap {
 		return p;
 	}
 
-	/**calculates the angle of branches of bifurcation to member: anglesBif
-	 * in base of the member pointpairs, that means the distance
-	 * between the near and far points of  the branches
+	/**
+	 * calculates the angle of branches of bifurcation to member: anglesBif in base
+	 * of the member pointpairs, that means the distance between the near and far
+	 * points of the branches
 	 */
 	private void bifurcationAngle() {
 		for (Map.Entry<Cell, Ridges> e : this.minutiaeMap.entrySet()) { // a Ridges osztály adattagja
@@ -518,7 +597,9 @@ public class RidgesMap {
 		}
 	}
 
-	/**toString method
+	/**
+	 * toString method
+	 * 
 	 * @return
 	 */
 	public String print() {
@@ -546,8 +627,10 @@ public class RidgesMap {
 		}
 		return out;
 	}
-	
-	/** getters - setters 
+
+	/**
+	 * getters - setters
+	 * 
 	 * @return
 	 */
 	public Set<Minutiae> getSet() {
@@ -582,7 +665,9 @@ public class RidgesMap {
 		this.minutiaeMapFinal = minutiaeMapFinal;
 	}
 
-	/**compare two Cell in base of their distance from a given point
+	/**
+	 * compare two Cell in base of their distance from a given point
+	 * 
 	 * @param c
 	 * @return
 	 */

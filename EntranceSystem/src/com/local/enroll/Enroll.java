@@ -94,13 +94,11 @@ public class Enroll {
 	 * @param name
 	 */
 	public void createImageByteArray(BufferedImage image, String name) {
-		Image im;
 		int verticalPixel = 1;
 		int horizontalPixel = 1;
 		int colorNum = 0;
 		int usedColor = 0;
 		File file = new File(name);
-		byte[] arrayImage = new byte[width * height];
 		try {
 			OutputStream streamOut = new FileOutputStream(file);
 			DataOutputStream fileOut = new DataOutputStream(streamOut);
@@ -180,23 +178,18 @@ public class Enroll {
 			}
 			// gray rectangle
 			if (array == null) {
-				for (int i = 0; i < width * height; i++) {
-					if (i % 2 == 0)
-						fileOut.writeByte((byte) 0x00);
-					else
-						fileOut.writeByte((byte) 0xff);
-				}
+//				for (int i = 0; i < width * height; i++) {
+//					if (i % 2 == 0)
+//						fileOut.writeByte((byte) 0x00);
+//					else
+//						fileOut.writeByte((byte) 0xff);
+//				}
 			} else {
 				// for 1 version
 				for (int i = 0, j = 0; i < width * height; i += 2, j++) {
 					fileOut.writeByte((byte) array[j] & (byte) 0xf0);
 					fileOut.writeByte((byte) (array[j] & (byte) 0x0f) << 4);
 				}
-				// for 2 version
-//	                      for (int i = 1, j = 0; i < width * height+1; i += 2, j++) {
-//	                            fileOut.writeByte((byte) array[j] & (byte) 0xf0);
-//	                            fileOut.writeByte((byte) (array[j] & (byte) 0x0f) << 4);
-//	                      }
 			}
 			fileOut.close();
 		} catch (IOException e) {
@@ -213,31 +206,36 @@ public class Enroll {
 		text = "";
 		StringBuilder sb = new StringBuilder();
 		SerialPort myport = new SerialPort(usedPort);
-		myport.openPort();
-		myport.setParams(SerialPort.BAUDRATE_57600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1,
+		try {
+			myport.openPort();
+			myport.setParams(SerialPort.BAUDRATE_57600, SerialPort.DATABITS_8, SerialPort.STOPBITS_1,
 				SerialPort.PARITY_NONE);
-		if (myport.isOpened()) {
-			System.out.println("The port is opened.");
-		}
-		Thread.sleep(3000);
-		message("Put your finger on sensor\nthen wait a while!");
-		while (myport.isOpened()) {
-			String curr = myport.readString();
-			if (curr != null) {
-				sb.append(curr);
-				System.out.print(curr + "\n");
-				text += curr;
-				if (curr.contains("e.") || curr.contains("\n.")) {
-					break;
+			if (myport.isOpened()) {
+				System.out.println("The port is opened.");
+			}
+			Thread.sleep(3000);
+			message("Put your finger on sensor\nthen wait a while!");
+			while (myport.isOpened()) {
+				String curr = myport.readString();
+				if (curr != null) {
+					sb.append(curr);
+					System.out.print(curr + "\n");
+					text += curr;
+					if (curr.contains("e.") || curr.contains("\n.")) {
+						break;
+					}
 				}
 			}
+			myport.closePort();
+			if (!myport.isOpened()) {
+				System.out.println("The port is closed.");
+			}
+			array = sb.toString().getBytes();
+			System.out.println("Nr of sent bytes: " + array.length);
+		} catch (SerialPortException e) {
+			System.out.println(e.getMessage());
+			message("The port is not opened. \nYou must the check USB connection.");
 		}
-		myport.closePort();
-		if (!myport.isOpened()) {
-			System.out.println("The port is closed.");
-		}
-		array = sb.toString().getBytes();
-		System.out.println("Nr of sent bytes: " + array.length);
 	}
 
 	public static byte[] toByteArray(String s) {
