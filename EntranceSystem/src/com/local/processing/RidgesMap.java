@@ -71,7 +71,7 @@ public class RidgesMap {
 
 
 	/**
-	 * calculates the data about terminations, bifurcations
+	 * calculates all of data about terminations, bifurcations
 	 * 
 	 * @param thinned
 	 */

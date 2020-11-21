@@ -544,6 +544,14 @@ public class BlockOrientation {
         return medianFrequency;
 	}
 
+	/**
+	 * @param block
+	 * @param blockOrientation
+	 * @param windowSize
+	 * @param minWaveLength
+	 * @param maxWaveLength
+	 * @return
+	 */
 	private static Mat calculateFrequency(Mat block, Mat blockOrientation, int windowSize, int minWaveLength,
 			int maxWaveLength) {
 		int rows = block.rows();
@@ -607,6 +615,10 @@ public class BlockOrientation {
 		return result;
 	}
 
+	/**
+	 * @param input
+	 * @return
+	 */
 	private static double calculateMean(double[] input) {
 		double sum = 0;
 		double avg = 0;
@@ -617,6 +629,10 @@ public class BlockOrientation {
 		return avg;
 	}
 
+	/**
+	 * @param image
+	 * @return
+	 */
 	private static double medianFrequency(Mat image) {
 		ArrayList<Double> values = new ArrayList<Double>();
 		double value = 0;
@@ -642,6 +658,10 @@ public class BlockOrientation {
 		return median;
 	}
 	
+	/**
+	 * @param image
+	 * @return
+	 */
 	private static double meanFrequency(Mat image) {
 		ArrayList<Double> values = new ArrayList<Double>();
 		double value = 0;
@@ -750,6 +770,10 @@ public class BlockOrientation {
 		}
 	}
 
+	/**
+	 * @param input
+	 * @return
+	 */
 	private static Mat meshGrid(int input) {
 		int size = (input * 2) + 1;
 		Mat out = new Mat(size, size, CvType.CV_32FC1);
@@ -763,6 +787,10 @@ public class BlockOrientation {
 		return out;
 	}
 
+	/**
+	 * @param input
+	 * @return
+	 */
 	private Mat cos(Mat input) {
         Mat out = new Mat(input.width(), input.height(), CvType.CV_32FC1);
         for (int i = 0; i < input.height(); i++) {
@@ -792,6 +820,10 @@ public class BlockOrientation {
 		return out;
 	}
 
+	/**
+	 * @param matList
+	 * @throws IOException
+	 */
 	public void calculateHistogram(List<Mat> matList) throws IOException {
 		for (int i = 0; i < this.list.size(); i++) {
 			Histogram histogram = new Histogram(matList.get(i));
@@ -823,6 +855,10 @@ public class BlockOrientation {
 		return out;
 	}
 
+	/** calculate mean of pixels in matrix
+	 * @param input
+	 * @return
+	 */
 	public double mean(Mat input) {
 		MatOfDouble mean = new MatOfDouble();
 		MatOfDouble deviation = new MatOfDouble();
@@ -831,6 +867,10 @@ public class BlockOrientation {
 		return meanValue;
 	}
 
+	/** calculate variance in image matrix
+	 * @param input
+	 * @return 
+	 */
 	public double variance(Mat input) {
 		MatOfDouble mean = new MatOfDouble();
 		MatOfDouble deviation = new MatOfDouble();
@@ -839,7 +879,10 @@ public class BlockOrientation {
 		return variance;
 	}
 
-// segédfüggvény: 2 D mátrixot Mat obj-má alakít (3 csatornás)
+	/** double [] [] 2 dims array to Mat object
+	 * @param a
+	 * @return
+	 */
 	public static Mat arrayToMat(double[][] a) {
 		Mat m = new Mat(height, width, matrixType);
 		for (int i = 0; i < height; i++) {
@@ -854,7 +897,11 @@ public class BlockOrientation {
 		return m;
 	}
 
-	// segédfüggvény: Mat obj-ot (3 csatornás) 2 D mátrix (256*288)
+	
+	/**
+	 * @param m
+	 * @return
+	 */
 	public static double[][] matToArray(Mat m) {
 		double[][] out = new double[height][width];
 		for (int i = 0; i < height; i++) {
@@ -869,6 +916,9 @@ public class BlockOrientation {
 		return out;
 	}	
 	
+	/**
+	 * @return
+	 */
 	public boolean roiCheck() {
 		boolean result = false;
 		int roiCount = 0;

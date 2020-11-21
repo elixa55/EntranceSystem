@@ -32,7 +32,6 @@ public class TemplateBuilder {
             }
             minutiaArray[i] = minutia;
         }
-     //   TemplateData templateData = new TemplateData(new Cell(widthImage, heightImage), minutiaArray);
         size = new Cell(widthImage, heightImage);
         minutiae = minutiaArray;
         buildEdgeTable();

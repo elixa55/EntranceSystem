@@ -51,7 +51,7 @@ public class LogicMatrix {
 		return out;
 	}
 
-	/**decides weather the given pixel is a ridge pixel or not
+	/**decides whether the given pixel is a ridge pixel or not
 	 * @param x
 	 * @param y
 	 * @param fallback
@@ -63,7 +63,7 @@ public class LogicMatrix {
 		return array[offset(x, y)];
 	}
 
-	/**decides weather the given pixel is a ridge pixel or not
+	/**decides whether the given pixel is a ridge pixel or not
 	 * @param at
 	 * @param fallback
 	 * @return

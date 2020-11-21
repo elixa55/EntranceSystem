@@ -4,7 +4,8 @@ import javafx.collections.ObservableList;
 
 public interface PersonDao {
 	
-    /**
+    /**setting params: 
+     * name of database: fingerprint
      * 
      */
     final String JDBC_DRIVER = "com.mysql.jdbc.Driver";

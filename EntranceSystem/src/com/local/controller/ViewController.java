@@ -787,11 +787,9 @@ public class ViewController implements Initializable {
 				imshow(ip.getSegmentedRidge(), "5 - Segmented");
 				imshow(ip.getFilteredRidgeShow(), "6 - Filtered");
 				imshow(ip.getBinarizedRidge(), "7 - Binarized");
-				imshow(ip.getThinnedRidge(), "8 - Thinned");
-				imshow(ip.getThinnedValley(), "9 - Thinned valley");
-				imshow(ip.getOpenedValley(), "10 - Valley after preprocessing");
-				imshow(ip.getWithAnglesRidge(), "11 - All candidate minutiae");
-				imshow(ip.getMinutiaeExtractedRidge(), "12 - Minutiae Extracted");
+				imshow(ip.getOpenedRidge(), "8 - Thinned");
+				imshow(ip.getWithAnglesRidge(), "9 - All candidate minutiae");
+				imshow(ip.getMinutiaeExtractedRidge(), "10 - Minutiae Extracted");
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
@@ -962,53 +960,16 @@ public class ViewController implements Initializable {
 			message("First enroll your finger!!");
 		} else {
 			try {
-				imshow(ip.getThinnedRidge(), "8 - Thinned");
+				imshow(ip.getOpenedRidge(), "8 - Thinned");
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
 		}
 	}
 	
-	/**
-	 * 11. Image processing menu: thinned valley
-	 * 
-	 * @param event
-	 * @throws Exception
-	 */
-	@FXML
-	void menuValley(ActionEvent event) throws Exception {
-		if (ip == null) {
-			message("First enroll your finger!!");
-		} else {
-			try {
-				imshow(ip.getThinnedValley(), "9 - Thinned valley");
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-		}
-	}
 
 	/**
-	 * 12. Image processing menu: thinned valley after preprocessing
-	 * 
-	 * @param event
-	 * @throws Exception
-	 */
-	@FXML
-	void menuPreprocessing(ActionEvent event) throws Exception {
-		if (ip == null) {
-			message("First enroll your finger!!");
-		} else {
-			try {
-				imshow(ip.getOpenedValley(), "10 - Thinned valley after preprocessing");
-			} catch (IOException e1) {
-				e1.printStackTrace();
-			}
-		}
-	}
-
-	/**
-	 * 13. Image processing menu: all candidate minutiae
+	 * 11. Image processing menu: all candidate minutiae
 	 * 
 	 * @param event
 	 * @throws Exception
@@ -1027,7 +988,7 @@ public class ViewController implements Initializable {
 	}
 
 	/**
-	 * 14. Image processing menu: minutiae extracted
+	 * 12. Image processing menu: minutiae extracted
 	 * 
 	 * @param event
 	 * @throws Exception

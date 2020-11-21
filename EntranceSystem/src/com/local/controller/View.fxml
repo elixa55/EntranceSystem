@@ -73,7 +73,7 @@
                                  <font>
                                     <Font size="11.0" />
                                  </font></TextArea>
-                              <Button layoutX="579.0" layoutY="85.0" mnemonicParsing="false" onAction="#buttonLoad" prefHeight="25.0" prefWidth="280.0" text="Load from database" />
+                              <Button layoutX="579.0" layoutY="85.0" mnemonicParsing="false" disable="true" onAction="#buttonLoad" prefHeight="25.0" prefWidth="280.0" text="Load image from File Browser" />
                            </children>
                         </AnchorPane>
                      </content>
@@ -136,8 +136,6 @@
                         <MenuItem mnemonicParsing="false" onAction="#menuFilter" style="-fx-text-fill: black;" text="Gabor Filtered" />
                         <MenuItem mnemonicParsing="false" onAction="#menuBinarize" style="-fx-text-fill: black;" text="Binarized" />
                         <MenuItem mnemonicParsing="false" onAction="#menuThin" style="-fx-text-fill: black;" text="Thinned" />
-                        <MenuItem mnemonicParsing="false" onAction="#menuValley" style="-fx-text-fill: black;" text="Thinned valley" />
-                        <MenuItem mnemonicParsing="false" onAction="#menuPreprocessing" style="-fx-text-fill: black;" text="Valley after preprocessing" />
                         <MenuItem mnemonicParsing="false" onAction="#menuMinutiaeAll" style="-fx-text-fill: black;" text="All candidate minutiae" />
                         <MenuItem mnemonicParsing="false" onAction="#menuMinutiaeExtracted" style="-fx-text-fill: black;" text="Extracted minutiae" />
                      </items>

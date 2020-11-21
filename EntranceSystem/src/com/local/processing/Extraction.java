@@ -24,6 +24,10 @@ import static processing.Extraction.roiContour;
 import static processing.ImageProcessing.*;
 import static processing.BlockOrientation.angle;
 
+/**
+ * @author kisgép1
+ *
+ */
 public class Extraction {
 
 	public static Scalar red = new Scalar(0, 0, 255);
@@ -41,15 +45,17 @@ public class Extraction {
 	}
 
 	/********************
-	 * False minutiae elimination steps******* 1.redõszakadások kiiktatása
-	 * 2.nyúlványok eltávolítása 3. H-pontok eltávolítása 4. túl közeli minuciák
-	 * eltávolítása (végzõdés, elágazás is) 5. perem minuciák eltávolítása
-	 ******************************************************************************/
+	 * False minutiae elimination main steps******* 
+	 * 1.gaps
+	 * 2.spur 
+	 * 3. H-points 
+	 * 4. too near minutiae
+	 * 5. border minutiae
+	 * ******************************************************************************/
 
 	/*************************
 	 * I. FALSE TERMINATION ELIMINATION according to ZHAO algorithm
 	 *******************/
-
 	/*
 	 * 0/0. step: dots elimination if rested after preprocessing
 	 */
@@ -127,6 +133,10 @@ public class Extraction {
 		//resizeAndShow(out, "Marked lakes");
 	}
 
+	/**
+	 * @param angle
+	 * @return
+	 */
 	public double convertHalfAngle(double angle) {
 		if (angle >= Math.PI) {
 			angle -= Math.PI;
@@ -134,6 +144,13 @@ public class Extraction {
 		return angle;
 	}
 
+	/** countour points list of ROI
+	 * @param set1
+	 * @param set2
+	 * @param p1
+	 * @param p2
+	 * @return
+	 */
 	public boolean setToContour(Set<Cell> set1, Set<Cell> set2, Point p1, Point p2) {
 		ArrayList<Point> list = new ArrayList<>();
 		boolean result = false;
@@ -226,6 +243,10 @@ public class Extraction {
 		// resizeAndShow(out, "ridge breaks");
 	}
 
+	/**
+	 * @param angle
+	 * @return
+	 */
 	public double angleTransform(double angle) {
 		if (angle >= Math.PI) {
 			angle -= Math.PI;
@@ -257,7 +278,7 @@ public class Extraction {
 									double dist = minDistDotLine(termRidge.getKey().getLocation(),
 											termIntRidge.getKey().getLocation(), bifValley.getKey().getLocation());
 									if (dist <= 0.7) {
-										// típust vált: term -> bif, átállítjuk az adatait is, ne legyen nullpointer ex.
+										// típust vált: term -> bif, átállítjuk az adatait is, ne legyen nullpointer exc.
 										termRidge.getKey().setType("bifurcation");
 										termRidge.getValue().setAngleBif(bifValley.getKey().getOrientation());
 										termRidge.getValue().setBifurcations(bifValley.getValue().getBifurcations());
@@ -273,6 +294,9 @@ public class Extraction {
 		//resizeAndShow(out, "change type term -> bif");
 	}
 	
+	/**
+	 * @throws IOException
+	 */
 	public void changeTypeInverse() throws IOException {
 		Mat out = this.ridge.getMatrix().clone();
 		for (Map.Entry<Minutiae, Ridges> bifValley : valley.getMinutiaeMapFinal().entrySet()) {
@@ -310,6 +334,9 @@ public class Extraction {
 		//resizeAndShow(out, "change type bif->term");
 	}
 
+	/**
+	 * @throws IOException
+	 */
 	public void changeType2() throws IOException {
 		Mat out = this.ridge.getMatrix().clone();
 		for (Map.Entry<Minutiae, Ridges> bifRidge : ridge.getMinutiaeMapFinal().entrySet()) {
@@ -329,6 +356,10 @@ public class Extraction {
 		//resizeAndShow(out, "change type 2, bif->term");
 	}
 
+	/** old version
+	 * @param ridge
+	 * @return
+	 */
 	public double calculateBifurcationAngle(Ridges ridge) {
 		Object[] array = ridge.anglesBif.toArray();
 		double alpha = (double) array[0];
@@ -352,6 +383,12 @@ public class Extraction {
 		return angle;
 	}
 
+	/** min of double params
+	 * @param a
+	 * @param b
+	 * @param c
+	 * @return
+	 */
 	public double minElement(double a, double b, double c) {
 		return Math.min(a, Math.min(b, c));
 	}
@@ -528,7 +565,6 @@ public class Extraction {
 	 * 4/2. step: if a minutia has more than one minutia corresponding in dual
 	 * skeleton
 	 */
-
 	public void notRealMinutiae() {
 		Set<Minutiae> section = new HashSet<>();
 		for (Map.Entry<Minutiae, Ridges> bifMin : ridge.getMinutiaeMapFinal().entrySet()) {
@@ -672,6 +708,12 @@ public class Extraction {
 		return out;
 	}
 
+	/** distance of a point and a line section given by 2 points
+	 * @param a
+	 * @param b
+	 * @param d
+	 * @return
+	 */
 	public double minDistDotLine(Point a, Point b, Point d) {
 		Point ab = new Point();
 		ab.x = b.x - a.x;
@@ -709,7 +751,13 @@ public class Extraction {
 	 * functions auxiliar of H points elmination
 	 * 
 	 **********************/
-	// pr the line section, is q in the line session?
+	
+	/** whether a point is on line segment or not
+	 * @param p
+	 * @param q
+	 * @param r
+	 * @return
+	 */
 	public boolean onSegment(Point p, Point q, Point r) {
 		if (q.x <= Math.max(p.x, r.x) && q.x >= Math.min(p.x, r.x) && q.y <= Math.max(p.y, r.y)
 				&& q.y >= Math.min(p.y, r.y))
@@ -724,6 +772,13 @@ public class Extraction {
 		return (val > 0) ? 1 : 2; 
 	}
 
+	/**whether two line segments are intersected or not
+	 * @param p1
+	 * @param p2
+	 * @param q1
+	 * @param q2
+	 * @return
+	 */
 	public boolean sessionsIntersect(Point p1, Point p2, Point q1, Point q2) {
 		int o1 = orientationSegment(p1, p2, q1);
 		int o2 = orientationSegment(p1, p2, q2);
@@ -742,12 +797,24 @@ public class Extraction {
 		return false;
 	}
 
+	/** the middle point of a line segment
+	 * @param a
+	 * @param b
+	 * @return
+	 */
 	public Point midPoint(Point a, Point b) {
 		double halfX = (a.x + b.x) / 2;
 		double halfY = (a.y + b.y) / 2;
 		return new Point(halfX, halfY);
 	}
 
+	/** angle intersected by 2 intersected line segments
+	 * @param a1
+	 * @param a2
+	 * @param b1
+	 * @param b2
+	 * @return
+	 */
 	public double angleOfIntersectPoint(Point a1, Point a2, Point b1, Point b2) {
 		Point a = new Point(a2.x - a1.x, a2.y - a1.y);
 		Point b = new Point(b2.x - b1.x, b2.y - b1.y);
@@ -761,6 +828,9 @@ public class Extraction {
 		return Math.acos(dot);
 	}
 
+	/** marks all minutiae in a thinned Mat image
+	 * @return
+	 */
 	public Mat allMinutia() {
 		Mat out = this.ridge.getMatrix().clone();
 		Scalar red = new Scalar(0, 0, 255);
@@ -784,6 +854,11 @@ public class Extraction {
 		return out;
 	}
 
+	/** angle of a line segment
+	 * @param cell1
+	 * @param cell2
+	 * @return
+	 */
 	public double orientationVector(Cell cell1, Cell cell2) {
 		double x = cell2.x - cell1.x;
 		double y = cell2.y - cell1.y;
@@ -823,7 +898,11 @@ public class Extraction {
 		return allMinutiaeList;
 	}
 
-	// segédfüggvény: Mat obj-ot (3 csatornás) 2 D mátrix (256*288)
+	
+	/** matrix 256×288 convert to 2 dims double array
+	 * @param m
+	 * @return
+	 */
 	public double[][] matToArray(Mat m) {
 		double[][] out = new double[height][width];
 		for (int i = 0; i < height; i++) {
@@ -838,6 +917,10 @@ public class Extraction {
 		return out;
 	}
 
+	/** calculate the mean of distance between ridges
+	 * @param input
+	 * @return
+	 */
 	public double avgRidgeDistance(Mat input) {
 		double sum = 0;
 		double distance = 0;
@@ -859,7 +942,10 @@ public class Extraction {
 		return distance;
 	}
 
-		// angles in radians
+		
+	/** angles given in radians
+	 * @return
+	 */
 	public Mat drawMinutiaeDirectionWithLabel() {
 		Mat out = this.ridge.getMatrix().clone();
 		Scalar termColor = new Scalar(190, 30, 190); // lila
@@ -900,6 +986,9 @@ public class Extraction {
 		return out;
 	}
 
+	/** visualise the angles of minutiae in Mat image
+	 * @return
+	 */
 	public Mat drawMinutiaeDirection() {
 		Mat out = this.ridge.getMatrix().clone();
 		Scalar termColor = new Scalar(190, 30, 190); // lila
@@ -924,17 +1013,22 @@ public class Extraction {
 		return out;
 	}
 
+	/** visualise the ridge skeletion and valley skeletion in Mat object
+	 * @param ridge
+	 * @param valley
+	 * @return
+	 */
 	public Mat combinatedRidgeValleyFromThinned(Mat ridge, Mat valley) {
 		Mat out = new Mat(ridge.size(), ridge.type());
 		for (int i = 0; i < height; i++) {
 			for (int j = 0; j < width; j++) {
 				double[] data = ridge.get(i, j);
 				double[] outData = new double[ridge.channels()];
-				if (data[0] == 0) { // redõvonal zöld
+				if (data[0] == 0) { 
 					outData[0] = 254;
 					outData[1] = 0;
 					outData[2] = 0;
-				} else { // háttér fehér
+				} else { 
 					outData[0] = 255;
 					outData[1] = 255;
 					outData[2] = 255;
@@ -947,23 +1041,23 @@ public class Extraction {
 				double[] data = valley.get(i, j);
 				double[] ridgeData = out.get(i, j);
 				double[] outData = new double[ridge.channels()];
-				if (data[0] == 0 && ridgeData[0] == 254) { // ahol metszi a redõ a barázdát
-					outData[0] = 254; // legyen kék
+				if (data[0] == 0 && ridgeData[0] == 254) { 
+					outData[0] = 254; 
 					outData[1] = 0;
 					outData[2] = 0;
-				} else if (data[0] == 0 && ridgeData[0] == 255) { // ahol csak barázda van
-					outData[0] = 255; // legyen lila
+				} else if (data[0] == 0 && ridgeData[0] == 255) { 
+					outData[0] = 255; 
 					outData[1] = 0;
 					outData[2] = 255;
-				} else if (data[0] == 255 && ridgeData[0] == 254) { // ahol csak redõ van
+				} else if (data[0] == 255 && ridgeData[0] == 254) {
 					outData[0] = 254;
 					outData[1] = 0;
 					outData[2] = 0;
-				} else if (data[0] == 255 && ridgeData[0] == 255) { // háttér marad is
+				} else if (data[0] == 255 && ridgeData[0] == 255) { 
 					outData[0] = 255;
 					outData[1] = 255;
 					outData[2] = 255;
-				} else { // mit hagytam ki???
+				} else { 
 					outData[0] = 0;
 					outData[1] = 0;
 					outData[2] = 0;

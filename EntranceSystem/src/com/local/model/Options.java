@@ -14,7 +14,7 @@ import javafx.collections.ObservableList;
  */
 public class Options {
 	
-     /** parameters for setting port 
+     /** parameters for setting communication port 
      * 
      */
     public final static ObservableList<String> BAUDRATE = FXCollections.observableArrayList(
@@ -34,6 +34,8 @@ public class Options {
             "COM5",
             "COM6", 
             "COM7",
-            "COM8"
+            "COM8",
+            "COM9",
+            "COM10"
       );
 }

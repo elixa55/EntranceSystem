@@ -14,6 +14,7 @@ public class Minutiae {
 	private String type;
 	
 	/**constructor
+	 * default angle set to 0
 	 * @param location
 	 * @param type
 	 */

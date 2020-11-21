@@ -11,13 +11,15 @@ public class Ridges {
 	public String type;
 	public boolean differ;
 	public Cell newPoint;
+	// termination ridges data
 	public Set<Cell> terminations;
+	public double angleTerm;
+	// bifurcation ridges data
 	public Set<Cell> bifurcations;
 	public Set<Cell> neighbours;
 	public Set<Cell> farPoints;
 	public Map<Cell, Cell> pointpairs;
-	public Set<Double> anglesBif;  // elágazás ágak x tengellyel bezárt szögeik
-	public double angleTerm;
+	public Set<Double> anglesBif;  
 	public double angleBif;
 	
 	public Ridges(String type) {

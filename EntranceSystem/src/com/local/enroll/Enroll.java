@@ -102,6 +102,7 @@ public class Enroll {
 		try {
 			OutputStream streamOut = new FileOutputStream(file);
 			DataOutputStream fileOut = new DataOutputStream(streamOut);
+			// header BMP standard
 			fileOut.writeByte((byte) 0x42);
 			fileOut.writeByte((byte) 0x4d);
 
@@ -202,7 +203,6 @@ public class Enroll {
 	 * @throws InterruptedException
 	 */
 	public void readDataFromSensor() throws SerialPortException, InterruptedException {
-		int dataBytes = height * width / 2;
 		text = "";
 		StringBuilder sb = new StringBuilder();
 		SerialPort myport = new SerialPort(usedPort);
